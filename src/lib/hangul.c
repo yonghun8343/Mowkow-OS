@@ -506,11 +506,12 @@ void flush_hangul_to_cmdline(struct CONSOLE *cons, struct TASK *task, char *cmdl
 }
 
 void not_korean(struct CONSOLE *cons, struct TASK *task, int key, char *cmdline) {
-    if (task->hangul.state != 0) {
-        flush_hangul_to_cmdline(cons, task, cmdline);
-    }
+    if (key == 0) return; // 펑션키 등 무시
 
-    set_hangul(task, 0, -1, -1, -1);
+    if (task->hangul.state != 0) { // 조합 중인 한글이 있다면 먼저 확정
+        flush_hangul_to_cmdline(cons, task, cmdline);
+        set_hangul(task, 0, -1, -1, -1); // 한글 조합 상태 초기화
+    }
     
     cmdline[cons->cmd_pos] = key;
     cons->cmd_pos++;
@@ -564,6 +565,7 @@ void draw_composing_char(struct TASK *task, struct CONSOLE *cons, int x, int y)
  * state 3: 초성+중성+종성 입력된 상태
  * 
  * state 4: 초성+중성+겹받침 입력된 상태
+ * 
  * @param cons: 콘솔 구조체 포인터
  * @param task: 현재 작업 구조체 포인터
  * @param key: 입력된 키 값 (ASCII 코드)
@@ -752,6 +754,7 @@ int hangul_automata_delete(struct CONSOLE *cons, struct TASK *task)
 
     // 화면 갱신
     if (hangul->state == 0) {   // 백스페이스 결과 조합 중인 문자가 없으면 지우기
+        // 커서 지우기
         boxfill8(cons->sht->buf, cons->sht->bxsize, COL8_000000, cons->cur_x - 16, cons->cur_y, cons->cur_x - 1, cons->cur_y + 15); // 배경 지우기
         sheet_refresh(cons->sht, cons->cur_x - 16, cons->cur_y, cons->cur_x, cons->cur_y + 16);
         cons->cur_x -= 16; // 커서 뒤로 이동

@@ -89,13 +89,13 @@ void console_task(struct SHEET *sht, int memtotal)
             }
 			if (256 <= i && i <= 511) {
 				if (i == 8 + 256) {                                         // backspace: 지우기
-                    // 조합 중인 한글 삭제 시도
-                    if (hangul_automata_delete(&cons, task) == 1) { 
-                        // 한글 오토마타가 처리함
-                        continue;
-                    }
                     if (cons.cur_x > 16) {
                         cons_putchar(&cons, ' ', 0);                    // 커서 지우기
+                                            // 조합 중인 한글 삭제 시도
+                        if (hangul_automata_delete(&cons, task) == 1) { 
+                            // 한글 오토마타가 처리함
+                            continue;
+                        }
 
                         unsigned char last_char = (unsigned char)cmdline[cons.cmd_pos - 1];
                         if (last_char < 0x80) {     // ASCII
@@ -128,6 +128,8 @@ void console_task(struct SHEET *sht, int memtotal)
 				} else if (i == 256 + 0x3b) {	// F1 눌림
                     // 언어 모드 변경
                     task->langmode ^= 1;
+                    flush_hangul_to_cmdline(&cons, task, cmdline); // 조합 중인 한글 확정
+                    set_hangul(task, 0, -1, -1, -1);    // 한글 오토마타 초기화
                 } else {
                     // 일반 문자 입출력
                     int key = i - 256;                      // 입력된 키 값 (ASCII 코드)
@@ -175,7 +177,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
                 putfonts8_asc_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);   // 공백 출력
             }
             cons->cur_x += 8;                                                                               // 커서 이동
-            if (cons->cur_x == 8 + 240) {
+            if (cons->cur_x == 8 + CONSOLE_TBOX_WIDTH) {                                                    
                 cons_newline(cons);                                                                         // 줄바꿈
             }
             if (((cons->cur_x - 8) & 0x1f) == 0) {                                                          // 탭 간격(32픽셀) 도달했으면 break;
@@ -192,7 +194,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
         }
         if (move != 0) { // 커서 이동
             cons->cur_x += 8;
-            if (cons->cur_x == 8 + 240) {
+            if (cons->cur_x == 8 + CONSOLE_TBOX_WIDTH) {
                 cons_newline(cons); // 줄바꿈
             }
         }
