@@ -67,7 +67,7 @@ void make_wtitle8(unsigned char *buf, int xsize, char *title, char act)
 
 	// TODO: 제목에 한글도 적을 수 있도록 해야함.
     boxfill8(buf, xsize, tbc, 3, 3, xsize - 4, 20);
-	putstr_utf8_buf(buf, xsize, 24, 4, tc, (unsigned char *)title);
+	putstr_utf8(buf, xsize, 24, 4, tc, (unsigned char *)title);
     
 	for (y = 0; y < 14; y++) {
 		for (x = 0; x < 16; x++) {

@@ -224,6 +224,12 @@ void inthandler20(int *esp);
 #define MAX_TASKS_LV  100   // max number of tasks per level
 #define MAX_TASKLEVELS  10  // max number of task levels
 
+struct HANGUL {
+    int state;
+    int cho, jung, jong;
+    char buf[4];
+};
+
 struct TSS32 {              // Task State Segment
 	int backlink, esp0, ss0, esp1, ss1, esp2, ss2, cr3;
 	int eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
@@ -243,8 +249,7 @@ struct TASK {
     int *fat;                           // 파일 할당 테이블
     char *cmdline;                      // 명령어 버퍼
     char langmode;                      // 언어 모드 (0: 영어, 1: 한국어)
-    char hangul_state;
-    char hangul_idx[3];
+    struct HANGUL hangul;               // 한글 오토마타 상태
 };
 
 struct TASKLEVEL {
@@ -279,6 +284,7 @@ void make_textbox8(struct SHEET *sht, int x0, int y0, int sx, int sy, int c);
 struct CONSOLE {
     struct SHEET *sht;
     int cur_x, cur_y, cur_c, cur_width;
+    int cmd_pos;
     struct TIMER *timer;
 };
 struct FILEHANDLE {
@@ -332,16 +338,12 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal);
 struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal);
 
 // hangul.c
-void put_johab(struct SHEET *sht, int x, int y, char color, unsigned char *font, unsigned short code);
+void put_johab(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *font, unsigned short code);
 unsigned short utf8_to_johab(unsigned char *s);
-void putstr_utf8(struct SHEET *sht, int x, int y, char color, unsigned char *s);
-void putstr_utf8_buf(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *s);
-int key2cho(char c);
-int key2jung(char c);
-int key2jong(char c);
-void unicode_to_utf8(unsigned short val, char *dest);
-int strcmp_utf8(char *s1, char *s2);
-void draw_composing_char(struct CONSOLE *cons, int x, int y, int cho, int jung, int jong);
-void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key);
+unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul);
+void putstr_utf8(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *s);
+void draw_composing_char(struct TASK *task, struct CONSOLE *cons, int x, int y);
+void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmdline);
 int hangul_automata_delete(struct CONSOLE *cons, struct TASK *task);
-void initialize_hangul(struct TASK *task);
+void flush_hangul_to_cmdline(struct CONSOLE *cons, struct TASK *task, char *cmdline);
+void set_hangul(struct TASK *task, int state, int cho, int jung, int jong);
