@@ -47,8 +47,8 @@ void console_task(struct SHEET *sht, int memtotal)
     task->fhandle = fhandle;        // 파일 핸들 배열 설정
     task->fat = fat;                // FAT 테이블 설정
 
-    task->langmode = 0;             // 영어 모드로 시작
-
+    task->langmode = 1;             // 영어 모드로 시작
+    set_hangul(task, 0, -1, -1, -1); // 한글 오토마타 초기화
     cons_putchar(&cons, '>', 1);    // 프롬프트 출력        
     cons.cmd_pos = 0;
 
