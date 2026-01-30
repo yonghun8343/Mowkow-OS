@@ -121,7 +121,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
 					cmdline[cons.cmd_pos] = 0;            // 명령어 라인 종료 문자
                     cons.cmd_pos = 0;
 
-                    // cons_debug(&cons, cmdline);    // 디버그용
+                    cons_debug(&cons, cmdline);    // 디버그용
                     
                     cons_newline(&cons);                        // 줄바꿈
                     cons_runcmd(cmdline, &cons, fat, memtotal); // 명령어 실행
@@ -963,9 +963,14 @@ int *inthandler0d(int *esp)
 void cons_debug(struct CONSOLE *cons, char *cmdline)
 {
     // --- 디버깅 용 ---
-    char s[40];
+    cons_newline(cons);
+    cons_putstr(cons, "Debug info:\n");
     unsigned char *c = (unsigned char *)cmdline;
-    sprintf(s, "\nInput: %02X %02X %02X %02X %02X %02X %02X %02X %02X", c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]);
-    cons_putstr(cons, s);
+    int i;
+    for (i=0; cmdline[i] != 0; i++) {
+        char s[40];
+        sprintf(s, "%02X ", c[i]);
+        cons_putstr(cons, s);
+    }
 	/// ----------------
 }

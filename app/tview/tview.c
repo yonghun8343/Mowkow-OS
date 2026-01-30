@@ -9,13 +9,13 @@ char *lineview(int win, int w, int y, int xskip, unsigned char *p, int tab);
 void HariMain(void)
 {
 	char winbuf[1024 * 757], txtbuf[240 * 1024];
-	int w = 60, h = 20, t = 4, spd_x = 1, spd_y = 1;
+	int w = 100, h = 30, t = 4, spd_x = 1, spd_y = 1;
 	int win, i, j, xskip = 0;
 	char s[30], *p, *q = 0, *r = 0;
 
 	api_cmdline(s, 30);
-	for (p = s; *p > ' '; p++) { }	
-	for (; *p != 0; ) {
+	for (p = s; (unsigned char)*p > ' '; p++) { }	
+	for (; (unsigned char)*p != 0; ) {
 		p = skipspace(p);
 		if (*p == '-') {
 			if (p[1] == 'w') {
@@ -49,7 +49,7 @@ err:
 				goto err;
 			}
 			q = p;
-			for (; *p > ' '; p++) { }
+			for (; (unsigned char)*p > ' '; p++) { }
 			r = p;
 		}
 	}
@@ -75,7 +75,7 @@ err:
 	api_fclose(i);
 	txtbuf[j + 1] = 0;
 	q = txtbuf + 1;
-	for (p = txtbuf + 1; *p != 0; p++) {
+	for (p = txtbuf + 1; (unsigned char)*p != 0; p++) {
 		if (*p != 0x0d) {
 			*q = *p;
 			q++;
@@ -171,62 +171,68 @@ void textview(int win, int w, int h, int xskip, char *p, int tab)
 
 char *lineview(int win, int w, int y, int xskip, unsigned char *p, int tab)
 {
-    int vx = -xskip;
-    int buffer_idx = 0;
-    char s[512];
+    int vx = -xskip;    // Visual X
+    int buffer_idx = 0; 
+    char s[512];        
 
-    int char_width;
-    int char_bytes;
+    int char_width; 
+    int char_bytes; 
     int i;
 
     for (;;) {
         if (*p == 0) {
             break;
         }
-        if (*p == 0x0a) {
-            p++;
-            break;
+        if (*p == 0x0a) { 
+            p++;          
+            break;        
         }
-        if (*p == 0x09) { 
+
+        if (*p == 0x09) { // 탭
             int space_len = tab - ((vx + xskip) % tab);
             char_width = space_len;
-            char_bytes = 1; 
-            
-            for (i = 0; i < space_len; i++) {
+            char_bytes = 1;
+        } else if ((*p & 0x80) == 0) { // ASCII
+            char_width = 1;
+            char_bytes = 1;
+        } else if ((*p & 0xE0) == 0xE0) { // 한글(3byte)
+            char_width = 2;
+            char_bytes = 3;
+        } else if ((*p & 0xC0) == 0xC0) { // 2byte 문자
+            char_width = 1;
+            char_bytes = 2;
+        } else {
+            char_width = 1;
+            char_bytes = 1;
+        }
+
+        if (vx + char_width > w) {
+            break; 
+        }
+
+        if (*p == 0x09) {
+            for (i = 0; i < char_width; i++) {
                 if (vx >= 0 && vx < w) {
                     s[buffer_idx++] = ' ';
                 }
                 vx++;
             }
             p++;
-            continue;
-
-        } else if ((*p & 0x80) == 0) { // ASCII (1바이트)
-            char_width = 1;
-            char_bytes = 1;
-        } else if ((*p & 0xE0) == 0xE0) { // UTF-8 한글 (1110xxxx)
-            char_width = 3;
-            char_bytes = 3;
         } else {
-            char_width = 1;
-            char_bytes = 1;
-        }
-
-        if (vx >= 0 && vx + char_width <= w) {
-            for (i = 0; i < char_bytes; i++) {
-                s[buffer_idx++] = p[i];
+            if (vx >= 0) {
+                for (i = 0; i < char_bytes; i++) {
+                    s[buffer_idx++] = p[i];
+                }
             }
+            vx += char_width;
+            p += char_bytes;
         }
-        
-
-        vx += char_width;
-        p += char_bytes;
-
     }
 
     if (buffer_idx > 0) {
-        s[buffer_idx] = 0; // Null Terminate
+        s[buffer_idx] = 0;
         api_putstrwin(win + 1, 8, y, 0, buffer_idx, s);
     }
-    return (char *)p;
+
+    return (char *)p; 
 }
