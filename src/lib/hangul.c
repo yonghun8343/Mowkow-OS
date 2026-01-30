@@ -516,7 +516,7 @@ void draw_composing_char(struct TASK *task, struct CONSOLE *cons, int x, int y)
     int jung = task->hangul.jung;
     int jong = task->hangul.jong;
 
-    if (cho != -1)johab |= (U2J_cho[cho] & 0x1F) << 10; // 초성
+    if (cho != -1)  johab |= (U2J_cho[cho] & 0x1F) << 10; // 초성
     if (jung != -1) johab |= (U2J_jung[jung] & 0x1F) << 5; // 중성
     if (jong != -1) johab |= (U2J_jong[jong] & 0x1F); // 종성
 
@@ -599,6 +599,7 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
     char s[2];
     int idx_cho, idx_jung, idx_jong;
 
+    // key -> UTF-8 인덱스
     idx_cho = key2cho(key);     // 초성 인덱스
     idx_jung = key2jung(key);   // 중성 인덱스
     idx_jong = key2jong(key);   // 종성 인덱스
@@ -700,7 +701,7 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
                 int next_cho_part = get_second_jong(complex_jong);
 
                 // 앞 글자 다시 그리기
-                update_prev_hangul(cons, task, hangul->state, hangul->cho, hangul->jung, prev_jong_part);
+                update_prev_hangul(cons, task, 3, hangul->cho, hangul->jung, prev_jong_part);
                 // 새 글자 그리기
                 start_new_hangul(cons, task, 2, next_cho_part, idx_jung, -1, cmdline);
             } else if (idx_cho != -1) {

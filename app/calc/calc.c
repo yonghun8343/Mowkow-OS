@@ -17,10 +17,10 @@ void HariMain(void)
     for (p=s; *p>' '; p++) { } // wait until space or null
     i = getnum(&p, 9);
     if (i == INVALID) {
-        api_putstr0("error!\n");
+        api_putstr("error!\n");
     } else {
         sprintf(s, "= %d = 0x%x\n", i, i);
-        api_putstr0(s);
+        api_putstr(s);
     }
     api_end();
 }

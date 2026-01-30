@@ -682,7 +682,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     } else if (edx == 2) {
         cons_putstr(cons, (char *) ebx + ds_base);
     } else if (edx == 3) {
-        cons_putstr1(cons, (char *) ebx + ds_base, ecx);
+        int len = ecx;
+        cons_put_utf8(cons, (char *) ebx + ds_base, len, 1);
     } else if (edx == 4) {
         return &(task->tss.esp0);
     } else if (edx == 5) {
@@ -696,7 +697,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         reg[7] = (int) sht;
     } else if (edx == 6) {
         sht = (struct SHEET *) (ebx & 0xfffffffe);
-        putfonts8_asc(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
+        putfonts(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
         if ((ebx & 1) == 0) {
             sheet_refresh(sht, esi, edi, esi + ecx * 8, edi + 16);
         }
@@ -867,6 +868,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
             i++;
         }
         reg[7] = i;
+    } else if (edx == 27) {
+        reg[7] = task->langmode;
     }
 
     return 0;

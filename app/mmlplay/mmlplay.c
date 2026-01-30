@@ -256,7 +256,7 @@ void waittimer(int timer, int time)
 void end(char *s)
 {
 	if (s != 0) {
-		api_putstr0(s);
+		api_putstr(s);
 	}
 	api_beep(0);
 	api_end();

@@ -1,0 +1,2 @@
+This file is test text file.
+한글 출력도 가능한가?

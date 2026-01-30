@@ -115,7 +115,7 @@ void HariMain(void)
     /* 기존: BMP인지 확인 -> 아니면 JPEG인지 확인 -> 아니면 에러 */
     /* 변경: 바로 JPEG인지 확인 -> 아니면 에러 */
     if (info_JPEG(&env, info, fsize, filebuf) == 0) {
-        api_putstr0("file type not JPEG.\n");
+        api_putstr("file type not JPEG.\n");
         api_end();
     }
 
@@ -181,7 +181,7 @@ unsigned char rgb2pal(int r, int g, int b, int x, int y)
 
 void error(char *s)
 {
-    api_putstr0(s);
+    api_putstr(s);
     api_end();
 }
 
