@@ -1,4 +1,5 @@
 #include "../include/bootpack.h"
+#include "../include/hangul.h"
 
 // 한글 음소 인덱스 테이블
 unsigned char HangulCode[3][32] = {
@@ -248,6 +249,14 @@ unsigned short utf8_to_johab(unsigned char *s)
     return johab;
 }
 
+/**
+ * @brief 한글 조합형 코드 구조체를 UTF-8 문자열로 변환하는 함수
+ * 
+ * @param dest: 변환된 UTF-8 문자열을 저장할 버퍼 (4바이트 필요)
+ * @param hangul: 변환할 한글 조합형 코드 구조체
+ * 
+ * @return 변환된 UTF-8 문자열 바이트 수(정상 변환 시 3), 한글이 아닐 경우 0 반환
+ */
 unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul)
 {
     int cho_idx = hangul.cho;
@@ -306,7 +315,7 @@ void putstr_utf8(unsigned char *vram, int xsize, int x, int y, char color, unsig
         if ((*s & 0x80) == 0) {
             // 1바이트 ASCII 문자
             s_temp[0] = *s;
-            putfonts8_asc((unsigned char *)vram, xsize, x, y, color, s_temp);
+            putfonts((unsigned char *)vram, xsize, x, y, color, s_temp);
             x += 8;
             s++;
         } else {
@@ -487,42 +496,6 @@ void set_hangul(struct TASK *task, int state, int cho, int jung, int jong)
     return;
 }
 
-void start_new_hangul(struct CONSOLE *cons, struct TASK *task, int state, int cho, int jung, int jong)
-{
-    set_hangul(task, state, cho, jung, jong);
-    draw_composing_char(task, cons, cons->cur_x, cons->cur_y);
-    return;
-}
-
-void flush_hangul_to_cmdline(struct CONSOLE *cons, struct TASK *task, char *cmdline)
-{
-    int written = johab_to_utf8(&cmdline[cons->cmd_pos], task->hangul);
-    
-    if (written > 0) {
-        cons->cmd_pos += written;
-    }
-
-    return;
-}
-
-void not_korean(struct CONSOLE *cons, struct TASK *task, int key, char *cmdline) {
-    if (key == 0) return; // 펑션키 등 무시
-
-    if (task->hangul.state != 0) { // 조합 중인 한글이 있다면 먼저 확정
-        flush_hangul_to_cmdline(cons, task, cmdline);
-        set_hangul(task, 0, -1, -1, -1); // 한글 조합 상태 초기화
-    }
-    
-    cmdline[cons->cmd_pos] = key;
-    cons->cmd_pos++;
-
-    char s[2];
-    s[0] = key;
-    s[1] = 0;
-    cons_putstr0(cons, s);
-    return;
-}
-
 /**
  * @brief 조합 중인 글자 그리기 함수
  * 
@@ -550,6 +523,55 @@ void draw_composing_char(struct TASK *task, struct CONSOLE *cons, int x, int y)
     boxfill8(cons->sht->buf, cons->sht->bxsize, COL8_000000, x, y, x+15, y+15); // 배경 지우기
     put_johab(cons->sht->buf, cons->sht->bxsize, x, y, COL8_FFFFFF, korean, johab);
     sheet_refresh(cons->sht, x, y, x+16, y+16);
+    return;
+}
+
+void flush_hangul_to_cmdline(struct CONSOLE *cons, struct TASK *task, char *cmdline)
+{
+    int written = johab_to_utf8(&cmdline[cons->cmd_pos], task->hangul);
+    
+    if (written > 0) {
+        cons->cmd_pos += written;
+    }
+
+    return;
+}
+
+void start_new_hangul(struct CONSOLE *cons, struct TASK *task, int state, int cho, int jung, int jong, char *cmdline)
+{
+    if (task->hangul.state != 0) {
+        flush_hangul_to_cmdline(cons, task, cmdline);
+    }
+
+    set_hangul(task, state, cho, jung, jong);
+    draw_composing_char(task, cons, cons->cur_x, cons->cur_y);
+    cons->cur_x += 16; // 커서 전진
+    return;
+}
+
+void update_prev_hangul(struct CONSOLE *cons, struct TASK *task, int state, int cho, int jung, int jong)
+{
+    set_hangul(task, state, cho, jung, jong);
+    draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y); // 조합 중인 글자 그리기
+
+    return;
+}
+
+void not_korean(struct CONSOLE *cons, struct TASK *task, int key, char *cmdline) {
+    if (key == 0) return; // 펑션키 등 무시
+
+    if (task->hangul.state != 0) { // 조합 중인 한글이 있다면 먼저 확정
+        flush_hangul_to_cmdline(cons, task, cmdline);
+        set_hangul(task, 0, -1, -1, -1); // 한글 조합 상태 초기화
+    }
+    
+    cmdline[cons->cmd_pos] = key;
+    cons->cmd_pos++;
+
+    char s[2];
+    s[0] = key;
+    s[1] = 0;
+    cons_putstr(cons, s);
     return;
 }
 
@@ -585,14 +607,12 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
     switch(hangul->state) {
         // state 0: 아무 것도 입력되지 않은 상태
         case 0:
-            if (idx_cho != -1) { // 초성이 입력 되어있다면?
+            if (idx_cho != -1) { // 초성 입력됨
                 // 초성 입력 -> 조합 시작
-                start_new_hangul(cons, task, 1, idx_cho, -1, -1);
-                cons->cur_x += 16; // 커서 전진
-            } else if (idx_jung != -1) { // 초성은 없는데 중성이 입력되었다면?
+                start_new_hangul(cons, task, 1, idx_cho, -1, -1, cmdline);
+            } else if (idx_jung != -1) { // 중성 입력됨
                 // 모음 단독 입력 -> 바로 출력
-                start_new_hangul(cons, task, 0, -1, idx_jung, -1);
-                cons->cur_x += 16; // 커서 전진
+                start_new_hangul(cons, task, 0, -1, idx_jung, -1, cmdline);
             } else {
                 // 한글 아님 -> 바로 출력
                 not_korean(cons, task, key, cmdline);
@@ -603,13 +623,10 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         case 1:
             if (idx_jung != -1) { // 중성이 입력되었다면?
                 // 중성 입력 -> 다음 상태로 전이
-                set_hangul(task, 2, hangul->cho, idx_jung, -1);
-                draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y); // 조합 중인 글자 그리기
+                update_prev_hangul(cons, task, 2, hangul->cho, idx_jung, -1);
             } else if (idx_cho != -1) { // 또 다른 초성이 입력되었다면?
                 // 초성 입력 -> 앞 글자 확정 후 새 글자 시작
-                flush_hangul_to_cmdline(cons, task, cmdline);
-                start_new_hangul(cons, task, 1, idx_cho, -1, -1);
-                cons->cur_x += 16; // 커서 전진
+                start_new_hangul(cons, task, 1, idx_cho, -1, -1, cmdline);
             } else {
                 // 한글 아님 -> 앞 글자 확정 후 새 글자 시작
                 not_korean(cons, task, key, cmdline);
@@ -620,22 +637,18 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         case 2:
             if (idx_jong != -1) {
                 // 종성 입력 -> 글자 완성 + 다음 상태로 전이
-                set_hangul(task, 3, hangul->cho, hangul->jung, idx_jong);
-                draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y);
+                update_prev_hangul(cons, task, 3, hangul->cho, hangul->jung, idx_jong);
             } else if (idx_jung != -1) {
                 // 모음 입력 -> 중성 합성 시도
                 int complex = get_composite_jung(hangul->jung, idx_jung);
 
                 if (complex != -1) {
                     // 조합 가능
-                    set_hangul(task, 2, hangul->cho, complex, -1);
-                    draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y);
+                    update_prev_hangul(cons, task, 2, hangul->cho, complex, -1);
                 } else {    
                     // 조합 불가
                     // 앞 글자 확정 후 새 글자 시작
-                    flush_hangul_to_cmdline(cons, task, cmdline);
-                    start_new_hangul(cons, task, 2, -1, idx_jung, -1);
-                    cons->cur_x += 16; // 커서 전진
+                    start_new_hangul(cons, task, 2, -1, idx_jung, -1, cmdline);
                 }
             } else {
                 // 한글 아님 -> 앞 글자 확정 후 새 글자 시작
@@ -650,29 +663,22 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
                 int prev_jung = hangul->jung;
                 int prev_jong = hangul->jong;
 
-                set_hangul(task, 2, prev_cho, prev_jung, -1); // 종성 제거
-                draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y); // 앞 글자 다시 그리기
-                flush_hangul_to_cmdline(cons, task, cmdline);
+                update_prev_hangul(cons, task, 2, prev_cho, prev_jung, -1);
 
                 int next_cho = jong2cho[prev_jong]; // 종성->초성 변환
                 if (next_cho != -1) {
-                    start_new_hangul(cons, task, 2, next_cho, idx_jung, -1);
-                    cons->cur_x += 16; // 커서 전진
+                    start_new_hangul(cons, task, 2, next_cho, idx_jung, -1, cmdline);
                 } else {
-                    start_new_hangul(cons, task, 0, -1, -1, -1);
+                    start_new_hangul(cons, task, 0, -1, -1, -1, cmdline);
                 }
             } else if (idx_cho != -1) {
                 // 자음 입력
                 int complex_jong = get_composite_jong(hangul->jong, idx_cho);
                 if (complex_jong != -1) {
-                    hangul->state = 4;
-                    set_hangul(task, 4, hangul->cho, hangul->jung, complex_jong);
-                    draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y);
+                    update_prev_hangul(cons, task, 4, hangul->cho, hangul->jung, complex_jong);
                 } else {
-                    flush_hangul_to_cmdline(cons, task, cmdline);
                     draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y);
-                    start_new_hangul(cons, task, 1, idx_cho, -1, -1);
-                    cons->cur_x += 16; // 커서 전진
+                    start_new_hangul(cons, task, 1, idx_cho, -1, -1, cmdline);
                 }
             } else {
                 // 한글 아님 -> 앞 글자 확정 후 새 글자 시작
@@ -694,18 +700,12 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
                 int next_cho_part = get_second_jong(complex_jong);
 
                 // 앞 글자 다시 그리기
-                set_hangul(task, hangul->state, hangul->cho, hangul->jung, prev_jong_part);
-                draw_composing_char(task, cons, cons->cur_x - 16, cons->cur_y);
-                flush_hangul_to_cmdline(cons, task, cmdline);
-                
+                update_prev_hangul(cons, task, hangul->state, hangul->cho, hangul->jung, prev_jong_part);
                 // 새 글자 그리기
-                start_new_hangul(cons, task, 2, next_cho_part, idx_jung, -1);
-                cons->cur_x += 16; // 커서 전진
+                start_new_hangul(cons, task, 2, next_cho_part, idx_jung, -1, cmdline);
             } else if (idx_cho != -1) {
                 // 자음 입력 -> 앞 글자 확정 후 새 글자 시작
-                flush_hangul_to_cmdline(cons, task, cmdline);
-                start_new_hangul(cons, task, 1, idx_cho, -1, -1);
-                cons->cur_x += 16; // 커서 전진
+                start_new_hangul(cons, task, 1, idx_cho, -1, -1, cmdline);
             } else {
                 not_korean(cons, task, key, cmdline);
             }

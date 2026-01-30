@@ -132,6 +132,9 @@ run: $(IMG_DIR)/haribote.img
 clean:
 	$(DEL) $(BUILD_DIR) $(IMG_DIR)
 
+iso : $(IMG_DIR)/haribote.img
+	$(FDIMG2ISO) $(TOOLPATH)/makeiso/fdimg2iso.dat $(IMG_DIR)/haribote.img $(IMG_DIR)/haribote.iso
+
 info:
 	@echo "[Kernel Sources] $(KERNEL_SRCS)"
 	@echo "[Driver Sources] $(DRIVERS_SRCS)"

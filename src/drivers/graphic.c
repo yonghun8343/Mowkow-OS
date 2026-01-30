@@ -1,5 +1,7 @@
 // graphic process
 #include "../include/bootpack.h"
+#include "../include/utf8.h"
+#include "../include/hangul.h"
 
 extern char hankaku[4096];
 unsigned char *system_font = (unsigned char *) hankaku; // 기본 시스템 폰트 주소 설정
@@ -153,6 +155,30 @@ void putfont8(char *vram, int xsize, int x, int y, char c, char *font)
     return;
 }
 
+void putfont(char *vram, int xsize, int x, int y, char color, unsigned char *s, int len)
+{
+    unsigned char *korean = (unsigned char *) *((int *) 0x0fe8); // 한글 폰트 주소
+    if (len == 1) {
+        if (*s == 0x0A || *s == 0x0D || *s == 0x09) return; // 제어문자 무시
+        
+        putfont8(vram, xsize, x, y, color, system_font + *s * 16);
+    } else if (len == 3) {
+        // UTF-8 -> Unicode -> Johab
+        unsigned short johab = utf8_to_johab(s);
+        put_johab(vram, xsize, x, y, color, korean, johab);
+    }
+}
+
+void putfonts(char *vram, int xsize, int x, int y, char c, unsigned char *s)
+{
+    while (*s != 0x00) {
+        int len = utf8_byte_len(*s);
+        putfont(vram, xsize, x, y, c, s, len);
+        x = (len == 1) ? x + 8 : x + 16;
+        s += len;
+    }
+}
+
 /**
  * @brief 영문 문자열을 비디오 메모리에 출력
  * 
@@ -172,41 +198,6 @@ void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s
         x += 8;
     }
     
-    return;
-}
-
-/**
- * @brief 16x16 크기의 폰트를 비디오 메모리에 출력
- * 
- * @param vram: 비디오 메모리 주소
- * @param xsize: 화면 가로 크기
- * @param x: 출력할 x 좌표
- * @param y: 출력할 y 좌표
- * @param c: 출력할 색상
- * @param s: 출력할 문자열
- * @return: void
- */
-void putfont16(char *vram, int xsize, int x, int y, char c, unsigned char *s) {
-    int i, j;
-    char *p;
-    unsigned char d;
-
-    for (i=0; i<16; i++) {
-        p = vram + (y + i) * xsize + x;
-        d = s[i * 2];
-        for (j=0; j<8; j++) {
-            if ((d & (0x80 >> j)) != 0) {
-                p[j] = c;
-            }
-        }
-
-        d = s[i * 2 + 1];
-        for (j=0; j<8; j++) {
-            if ((d & (0x80 >> j)) != 0) {
-                p[j + 8] = c;
-            }
-        }
-    }
     return;
 }
 

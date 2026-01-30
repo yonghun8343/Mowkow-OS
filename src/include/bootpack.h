@@ -62,6 +62,8 @@ void putfont16(char *vram, int xsize, int x, int y, char c, unsigned char *s);
 void init_mouse_cursor8(char *mouse, char bc);
 void putblock8_8(char *vram, int vxsize, int pxsize,
                  int pysize, int px0, int py0, char *buf, int bxsize);
+void putfont(char *vram, int xsize, int x, int y, char color, unsigned char *s, int len);
+void putfonts(char *vram, int xsize, int x, int y, char c, unsigned char *s);
 
 // color constants
 #define COL8_000000    0  // black
@@ -279,6 +281,7 @@ void make_wtitle8(unsigned char *buf, int xsize, char *title, char act);
 void change_wtitle8(struct SHEET *sht, char act);
 void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
 void make_textbox8(struct SHEET *sht, int x0, int y0, int sx, int sy, int c);
+void putfonts_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
 
 // console.c
 struct CONSOLE {
@@ -292,8 +295,9 @@ struct FILEHANDLE {
     int size;
     int pos;
 };
-void console_task(struct SHEET *sht, int memtotal);
+void console_task(struct SHEET *sht, int memtotal, int langmode);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
+void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move);
 void cons_putstr0 (struct CONSOLE *cons, char *s);
 void cons_putstr1(struct CONSOLE *cons, char *s, int l);
 void cons_newline(struct CONSOLE *cons);
@@ -302,8 +306,8 @@ void cmd_mem(struct CONSOLE *cons, int memtotal);
 void cmd_cls(struct CONSOLE *cons);
 void cmd_dir(struct CONSOLE *cons);
 void cmd_exit(struct CONSOLE *cons, int *fat);
-void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal);
-void cmd_ncst(struct CONSOLE *cons, char *cmdline, int memtotal);
+void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode);
+void cmd_ncst(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode);
 void cmd_langmode(struct CONSOLE *cons, char *cmdline);
 void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col);
 int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline);
@@ -334,16 +338,6 @@ int tek_getsize(unsigned char *p);
 int tek_decomp(unsigned char *p, char *q, int size);
 
 // bootpack.c
-struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal);
-struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal);
+struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal, int langmode);
+struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal, int langmode);
 
-// hangul.c
-void put_johab(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *font, unsigned short code);
-unsigned short utf8_to_johab(unsigned char *s);
-unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul);
-void putstr_utf8(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *s);
-void draw_composing_char(struct TASK *task, struct CONSOLE *cons, int x, int y);
-void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmdline);
-int hangul_automata_delete(struct CONSOLE *cons, struct TASK *task);
-void flush_hangul_to_cmdline(struct CONSOLE *cons, struct TASK *task, char *cmdline);
-void set_hangul(struct TASK *task, int state, int cho, int jung, int jong);
