@@ -56,6 +56,8 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
     cons_put_utf8(&cons, ">", 1, 1);     // 프롬프트 출력        
     cons.cmd_pos = 0;
 
+    static int k_cnt = 0;
+
     // 메인 루프
     for (;;) {
         io_cli(); // 인터럽트 금지
@@ -121,7 +123,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
 					cmdline[cons.cmd_pos] = 0;            // 명령어 라인 종료 문자
                     cons.cmd_pos = 0;
 
-                    cons_debug(&cons, cmdline);    // 디버그용
+                    // cons_debug(&cons, cmdline);    // 디버그용
                     
                     cons_newline(&cons);                        // 줄바꿈
                     cons_runcmd(cmdline, &cons, fat, memtotal); // 명령어 실행
@@ -137,9 +139,24 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
                 } else {
                     // 일반 문자 입출력
                     int key = i - 256;                      // 입력된 키 값 (ASCII 코드)
-                    if (task->langmode == 1) {                  // 한글 모드
+
+                    if (key == 0xFF) {                 // 가상 제어 문자
+                        task->langmode ^= 1;
+                    } else if (task->langmode == 1) {                  // 한글 모드
                         if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
-                            hangul_automata(&cons, task, key, cmdline);      // 한글 오토마타가 처리
+                            if (key < 0x80) {
+                                hangul_automata(&cons, task, key, cmdline);      // 한글 오토마타가 처리
+                            } else {
+                                if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
+                                    k_cnt++;
+                                    cmdline[cons.cmd_pos] = key;
+                                    cons.cmd_pos++;
+                                    if (k_cnt == 3) {
+                                        cons_put_utf8(&cons, &cmdline[cons.cmd_pos - 3], 3, 1); // UTF-8 문자 출력
+                                        k_cnt = 0;
+                                    }
+                                }
+                            }
                         }
                     } else {                                        // 영어 모드
 					    if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
@@ -386,13 +403,17 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
         cmd_exit(cons, fat);
     } else if (strncmp(cmdline, "start ", 6) == 0 || strncmp(cmdline, "실행 ", 3) == 0) {
         cmd_start(cons, cmdline, memtotal, cons->sht->task->langmode);
-    } else if (strncmp(cmdline, "ncst ", 5) == 0) {
+    } else if (strncmp(cmdline, "ncst ", 5) == 0 || strncmp(cmdline, "바로실행 ", 5) == 0) {
         cmd_ncst(cons, cmdline, memtotal, cons->sht->task->langmode);
-    } else if (strncmp(cmdline, "langmode ", 9) == 0) {
+    } else if (strncmp(cmdline, "langmode ", 9) == 0 || strncmp(cmdline, "언어 ", 3) == 0) {
         cmd_langmode(cons, cmdline);
     } else if (cmdline[0] != 0) {			
-        if (cmd_app(cons, fat, cmdline) == 0) {			
-            cons_putstr(cons, "Bad command.\n\n");
+        if (cmd_app(cons, fat, cmdline) == 0) {		
+            if (cons->sht->task->langmode == 0) {
+                cons_putstr(cons, "Bad command.\n\n");
+            } else {
+                cons_putstr(cons, "잘못된 명령어.\n\n");
+            }
         }   
     }
 
@@ -515,12 +536,22 @@ void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode)
 	sheet_slide(sht, 32, 4);
 	sheet_updown(sht, shtctl->top);
 
+    int current_langmode = langmode;
+
     while (cmdline[i] != ' ') {
         i++;
     }
     i++; // skip space
-	for (; cmdline[i] != 0; i++) {
-        fifo32_put(fifo, cmdline[i] + 256);
+	
+    for (; cmdline[i] != 0; i++) {
+        unsigned char c = cmdline[i];
+        int needed_mode = (c >= 0x80) ? 1 : 0;
+
+        if (current_langmode != needed_mode) {
+            fifo32_put(fifo, 0xFF + 256); // 가상 제어 문자 전송
+            current_langmode = needed_mode;
+        }
+        fifo32_put(fifo, c + 256); // ASCII를 key code로 변환해서 버퍼에 넣기
     }
     fifo32_put(fifo, 10 + 256);	// Enter
 	return;
@@ -538,11 +569,25 @@ void cmd_ncst(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode)
 {
 	struct TASK *task = open_constask(0, memtotal, langmode);
 	struct FIFO32 *fifo = &task->fifo;
-	int i;
-	for (i = 5; cmdline[i] != 0; i++) {
-		fifo32_put(fifo, cmdline[i] + 256);
-	}
-	fifo32_put(fifo, 10 + 256);	// Enter
+	int i = 0;
+    int current_langmode = langmode;
+
+    while (cmdline[i] != ' ') {
+        i++;
+    }
+    i++; // skip space
+
+    for (; cmdline[i] != 0; i++) {
+        unsigned char c = cmdline[i];
+        int needed_mode = (c >= 0x80) ? 1 : 0;
+
+        if (current_langmode != needed_mode) {
+            fifo32_put(fifo, 0xFF + 256); // 가상 제어 문자 전송
+            current_langmode = needed_mode;
+        }
+        fifo32_put(fifo, c + 256); // ASCII를 key code로 변환해서 버퍼에 넣기
+    }
+    fifo32_put(fifo, 10 + 256);	// Enter
 	cons_newline(cons);
 	return;
 }
@@ -557,17 +602,25 @@ void cmd_ncst(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode)
 void cmd_langmode(struct CONSOLE *cons, char *cmdline)
 {
     struct TASK *task = task_now();
-    unsigned char mode = cmdline[9] - '0';
-    int i;
+    int i = 0;
+    while (cmdline[i] != ' ') {
+        i++;
+    }
+    i++; // skip space
+    unsigned char mode = cmdline[i] - '0';
     if (mode <= 1) {
         task->langmode = mode;
         if (mode == 0) {
             cons_putstr(cons, "[English]\n");
         } else {
-            cons_putstr(cons, "[Korean]\n");
+            cons_putstr(cons, "[한글]\n");
         }
     } else {
-        cons_putstr(cons, "langmode command error. (0: English, 1: Korean)\n");
+        if (task->langmode == 0) {
+            cons_putstr(cons, "langmode command error. (0: English, 1: Korean)\n");
+        } else {
+            cons_putstr(cons, "언어 명령어 오류. (0: 영어, 1: 한글)\n");
+        }
     }
     cons_newline(cons);
     return;
@@ -962,7 +1015,6 @@ int *inthandler0d(int *esp)
 
 void cons_debug(struct CONSOLE *cons, char *cmdline)
 {
-    // --- 디버깅 용 ---
     cons_newline(cons);
     cons_putstr(cons, "Debug info:\n");
     unsigned char *c = (unsigned char *)cmdline;
@@ -972,5 +1024,4 @@ void cons_debug(struct CONSOLE *cons, char *cmdline)
         sprintf(s, "%02X ", c[i]);
         cons_putstr(cons, s);
     }
-	/// ----------------
 }
