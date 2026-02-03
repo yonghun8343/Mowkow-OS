@@ -652,15 +652,20 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 
     if (edx == 1) {
+        // api_putchar()
         cons_putchar(cons, eax & 0xff, 1);
     } else if (edx == 2) {
+        // api_putstr(char *s)
         cons_putstr(cons, (char *) ebx + ds_base);
     } else if (edx == 3) {
+        // api_putstr_len(char *s, int l)
         int len = ecx;
         cons_put_utf8(cons, (char *) ebx + ds_base, len, 1);
     } else if (edx == 4) {
+        // api_end()
         return &(task->tss.esp0);
     } else if (edx == 5) {
+        // api_openwin(char *buf, int xsiz, int ysiz, int col_inv, char *title)
         sht = sheet_alloc(shtctl);
         sht->task = task;
         sht->flags |= 0x10;
@@ -719,6 +724,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     } else if (edx == 14) {
         sheet_free((struct SHEET *) ebx);
     } else if (edx == 15) {
+        // api_getkey(int mode)
         for (;;) {
             io_cli();
             if (fifo32_status(&task->fifo) == 0) {

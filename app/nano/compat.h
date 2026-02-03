@@ -25,12 +25,20 @@ extern filestruct *filebot;
 extern filestruct *current;
 extern filestruct *cutbuffer;
 
+int wgetch(void *win);
+void *nano_malloc(int size);
+void nano_free(void *ptr);
 void *realloc(void *ptr, int size);
 void wmove(void *win, int y, int x);
 void waddstr(void *win, char *str);
+void waddch(void *win, int c);
 void wrefresh(void *win);
-int wgetch(void *win);
 void wattron(void *win, int attr);
 void wattroff(void *win, int attr);
+int my_strlen(char *str);
+int my_tolower(int c);
+char *my_strcpy(char *dest, const char *src);
+char *my_strncpy(char *dest, char *src, int n);
+char *my_strstr(char *haystack, char *needle);
 
 #endif  /* _COMPAT_H_ */

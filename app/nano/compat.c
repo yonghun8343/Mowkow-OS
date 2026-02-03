@@ -1,44 +1,98 @@
 #include "compat.h"
 #include "nano.h"
+#include "proto.h"
 #include "../include/apilib.h"
+#include <stdio.h>
+#include <stdarg.h>
 
 
 int current_win = -1;
 int reverse_mode = 0;
 
-void *topwin    = (void *)1;
-void *edit      = (void *)2;
-void *bottomwin = (void *)3;
+extern void *topwin;
+extern void *edit;
+extern void *bottomwin;
 
 extern int cur_x;
 extern int cur_y;
 
+int ctrl_pressed = 0;
+
+int wgetch(void *win)
+{
+    int key;
+
+    for (;;) {
+        key = api_getkey(1);
+
+        if (key == 0x1D) { // Ctrl Key Pressed
+            ctrl_pressed = 1;
+            continue;
+        }
+        if (key == 0x9D) { // Ctrl Key Released
+            ctrl_pressed = 0;
+            continue;
+        }
+        if (key >= 'a' && key <= 'z') {
+            if (ctrl_pressed) {
+                // Ctrl + a(97) -> 1 (Control_A)
+                // 공식: 키값 - 'a' + 1
+                return key - 'a' + 1; 
+            }
+            return key;
+        }
+
+        if (key == 0x0A) {
+            return 13;
+        }
+
+        if (key == 0x08) {
+            return 127;
+        }
+        return key;
+    }
+}
+
+void *nano_malloc(int size)
+{
+    int *p = (int *)api_malloc(size + 4);
+    if (p == 0) return 0;
+
+    *p = size;
+
+    return (void *)(p + 1);
+}
+
+void nano_free(void *ptr) 
+{
+    if (ptr == 0) return;
+
+    int *p = ((int *)ptr) - 1;
+
+    int size = *p;
+    api_free((char *)p, size + 4);
+    return;
+}
+
 void *realloc(void *ptr, int size)
 {
-    if (ptr == 0) return api_malloc(size);
-    int old_len = 0;
-    if (ptr) {
-        char *p = (char *)ptr;
-        while (*p) {
-            p++;
-        }
-        old_len = p - (char *)ptr;
-    }
+    if (ptr == 0) return nano_malloc(size);
+    int *header = ((int *)ptr) - 1;
+    int old_len = *header;
+    void *new_ptr = nano_malloc(size);
+    if (new_ptr == 0) return 0;
 
-    void *new_ptr = api_malloc(size);
-    if (new_ptr != 0) {
-        char *src = (char *)ptr;
-        char *dst = (char *)new_ptr;
-        int i;
-        for (i=0; i<old_len && i<size; i++) {
-            dst[i] = src[i];
-        }
-        for (; i<size; i++) {
-            dst[i] = 0;
-        }
-    }
+    char *src = (char *)ptr;
+    char *dst = (char *)new_ptr;
+    int copy_len = (old_len < size) ? old_len : size;
 
-    api_free(ptr, old_len+1);
+    int i;
+    for (i=0; i<copy_len; i++) dst[i] = src[i];
+
+    if (size > old_len) dst[copy_len] = 0; // Null Terminator
+    
+    nano_free(ptr);
+
     return new_ptr;
 }
 
@@ -96,23 +150,6 @@ void wrefresh(void *win)
     api_refreshwin(current_win, 0, 0, 700, 450);
 }
 
-int wgetch(void *win)
-{
-    int key;
-
-    key = api_getkey(1);
-
-    if (key == 0x0A) {
-        return 13;
-    }
-
-    if (key == 0x08) {
-        return 127;
-    }
-
-    return key;
-}
-
 void wattron(void *win, int attr) {
     if (attr == 1) reverse_mode = 1;
     return;
@@ -121,4 +158,60 @@ void wattron(void *win, int attr) {
 void wattroff(void *win, int attr) {
     if (attr == 1) reverse_mode = 0;
     return;
+}
+
+int my_strlen(char *str) {
+    int len = 0;
+    while (*str++) len++;
+    return len;
+}
+
+int my_tolower(int c) {
+    if (c >= 'A' && c <= 'Z') {
+        return c + ('a' - 'A');
+    }
+    return c;
+}
+
+char *my_strcpy(char *dest, const char *src) {
+    char *d = dest;
+    while ((*d++ = *src++) != '\0');
+    return dest;
+}
+
+char *my_strncpy(char *dest, char *src, int n) {
+    char *d = dest;
+    int i;
+    for (i = 0; i < n; i++) {
+        if (src[i] == '\0') {
+            break;
+        }
+        d[i] = src[i];
+    }
+    d[i] = '\0';
+    return dest;
+}
+
+char *my_strstr(char *haystack, char *needle) {
+    char *h, *n;
+
+    if (*needle == 0) {
+        return haystack;
+    }
+
+    for (; *haystack != 0; haystack++) {
+        if (*haystack == *needle) {
+            h = haystack;
+            n = needle;
+            while (*h != 0 && *n != 0 && *h == *n) {
+                h++;
+                n++;
+            }
+
+            if (*n == 0) {
+                return haystack;
+            }
+        }
+    }
+    return 0;
 }
