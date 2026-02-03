@@ -1,5 +1,5 @@
 // mouse controller implementation
-
+#include "../include/asmfunc.h"
 #include "../include/bootpack.h"
 
 struct FIFO32 *mousefifo;

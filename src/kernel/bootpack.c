@@ -2,7 +2,6 @@
 
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
-#include "../include/hangul.h"
 #include <stdio.h>
 
 #define KEYCMD_LED		0xed

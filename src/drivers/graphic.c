@@ -1,4 +1,5 @@
 // graphic process
+#include "../include/asmfunc.h"
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
 #include "../include/hangul.h"
