@@ -545,7 +545,11 @@ void start_new_hangul(struct CONSOLE *cons, struct TASK *task, int state, int ch
 
     set_hangul(task, state, cho, jung, jong);
     draw_composing_char(task, cons, cons->cur_x, cons->cur_y);
-    cons->cur_x += 16; // 커서 전진
+    if (cons->cur_x + 16 >= CONSOLE_TBOX_WIDTH) {
+        cons_newline(cons);
+    } else {
+        cons->cur_x += 16; // 커서 전진
+    }
     return;
 }
 
