@@ -28,7 +28,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
     int i, *fat = (int *) memman_alloc_4k(memman, 4 * 2880);            // FAT 테이블용 메모리 할당
 	struct CONSOLE cons;                                                // 콘솔 구조체
     struct FILEHANDLE fhandle[8];                                       // 파일 핸들 구조체 배열
-    char cmdline[128];                                                  // 명령어 입력 버퍼
+    char cmdline[256];                                                  // 명령어 입력 버퍼
 
     // 콘솔 구조체 초기화
     cons.sht = sht;
@@ -138,32 +138,28 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
                     set_hangul(task, 0, -1, -1, -1);    // 한글 오토마타 초기화
                 } else {
                     // 일반 문자 입출력
+                    if (cons.cmd_pos >= 255) continue; // 명령어 버퍼 오버플로우 방지
+
                     int key = i - 256;                      // 입력된 키 값 (ASCII 코드)
 
                     if (key == 0xFF) {                 // 가상 제어 문자
                         task->langmode ^= 1;
                     } else if (task->langmode == 1) {                  // 한글 모드
-                        if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
-                            if (key < 0x80) {
-                                hangul_automata(&cons, task, key, cmdline);      // 한글 오토마타가 처리
-                            } else {
-                                if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
-                                    k_cnt++;
-                                    cmdline[cons.cmd_pos] = key;
-                                    cons.cmd_pos++;
-                                    if (k_cnt == 3) {
-                                        cons_put_utf8(&cons, &cmdline[cons.cmd_pos - 3], 3, 1); // UTF-8 문자 출력
-                                        k_cnt = 0;
-                                    }
-                                }
+                        if (key < 0x80) {
+                            hangul_automata(&cons, task, key, cmdline);      // 한글 오토마타가 처리
+                        } else {
+                            k_cnt++;
+                            cmdline[cons.cmd_pos] = key;
+                            cons.cmd_pos++;
+                            if (k_cnt == 3) {
+                                cons_put_utf8(&cons, &cmdline[cons.cmd_pos - 3], 3, 1); // UTF-8 문자 출력
+                                k_cnt = 0;
                             }
                         }
                     } else {                                        // 영어 모드
-					    if (cons.cur_x < 8 + CONSOLE_TBOX_WIDTH) {
-						    cmdline[cons.cmd_pos] = key;  // 명령어 라인에 문자 저장
-                            cons.cmd_pos++;
-						    cons_put_utf8(&cons, (char *)&key, 1, 1);        // 문자 출력
-					    }
+						cmdline[cons.cmd_pos] = key;  // 명령어 라인에 문자 저장
+                        cons.cmd_pos++;
+						cons_put_utf8(&cons, (char *)&key, 1, 1);        // 문자 출력
                     }
 				}
 			}
@@ -225,39 +221,38 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
  */
 void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move)
 {
-    if (len == 1) {
-        if (s[0] == 0x09) { // 탭 문자 처리
-            for (;;) {
-                if (cons->sht != 0) {
-                    putfonts_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);        // 공백 출력
-                }
-                cons->cur_x += 8;                                                                               // 커서 이동
-                if (cons->cur_x == 8 + CONSOLE_TBOX_WIDTH) {                                                    
-                    cons_newline(cons);                                                                         // 줄바꿈
-                }
-                if (((cons->cur_x - 8) & 0x1f) == 0) {                                                          // 탭 간격(32픽셀) 도달했으면 break;
-                    break;
-                }
+    if (s[0] == 0x09) {
+        for (;;) {
+            if (cons->sht != 0) {
+                putfonts_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);        // 공백 출력
             }
-            return;
-        } else if (s[0] == 0x0a) { // 줄바꿈
-            cons_newline(cons);
-            return;
-        } else if (s[0] == 0x0d) { // 뭐 없음
-            // do nothing
-            return;
+            cons->cur_x += 8;                                                                               // 커서 이동
+            if (cons->cur_x >= 8 + CONSOLE_TBOX_WIDTH) {                                                    
+                cons_newline(cons);                                                                         // 줄바꿈
+            }
+            if (((cons->cur_x - 8) & 0x1f) == 0) {                                                          // 탭 간격(32픽셀) 도달했으면 break;
+                break;
+            }
+        }
+    } else if (s[0] == 0x0a) { // 줄바꿈
+        cons_newline(cons);
+    } else if (s[0] == 0x0d) { // 뭐 없음
+        // do nothing
+    } else {
+        int width = (len == 1) ? 8 : 16;
+        if (cons->cur_x + width >= 8 + CONSOLE_TBOX_WIDTH) {
+            boxfill8(cons->sht->buf, cons->sht->bxsize, COL8_000000, cons->cur_x, cons->cur_y, cons->cur_x + width - 1, cons->cur_y + 15); // 배경 지우기
+            sheet_refresh(cons->sht, cons->cur_x, cons->cur_y, cons->cur_x + width, cons->cur_y + 16);
+            cons_newline(cons); // 줄바꿈
+        }
+        if (cons->sht != 0) {
+            putfonts_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, len);               // 문자 출력
+        }
+        if (move != 0) { // 커서 이동
+            cons->cur_x += width;
         }
     }
-    if (cons->sht != 0) {
-        putfonts_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, len);               // 문자 출력
-    }
-    if (move != 0) { // 커서 이동
-            int width = (len == 1) ? 8 : 16;
-            cons->cur_x += width;
-            if (cons->cur_x >= 8 + CONSOLE_TBOX_WIDTH) {
-                cons_newline(cons); // 줄바꿈
-            }
-    }
+
     return;
 }
 
@@ -274,81 +269,6 @@ void cons_putstr(struct CONSOLE *cons, char *s)
     return;
 }
 
-/** 
- * @brief 콘솔에 문자열 포인터 사용하여 출력
- *
- * @param cons: 콘솔 구조체 포인터
- * @param s: 출력할 문자열 포인터
- * @return: void
-*/
-void cons_putstr0 (struct CONSOLE *cons, char *s)
-{
-    unsigned char *korean = (unsigned char *) *((int *) 0x0fe8);
-    unsigned short johab;
-    int code;
-
-    for (; *s!=0; s++) {
-        if ((*s & 0x80) == 0) { // ASCII
-            cons_putchar(cons, *s, 1);
-        } else if ((*s & 0xe0) == 0xe0) {
-            if (s[1] == 0 || s[2] == 0) break; // 문자열 끝 예외처리
-            johab = utf8_to_johab((unsigned char *) s);
-            if (johab != 0) {
-                // 한글 출력
-                if (cons->sht != 0) {
-                    put_johab(cons->sht->buf, cons->sht->bxsize, cons->cur_x, cons->cur_y, COL8_FFFFFF, korean, johab);
-                    sheet_refresh(cons->sht, cons->cur_x, cons->cur_y, cons->cur_x + 16, cons->cur_y + 16);
-                }
-                cons->cur_x += 16;
-
-                if (cons->cur_x + 16 > cons->sht->bxsize) {
-                    cons_newline(cons);
-                }
-            }
-            s += 2; // 3바이트 문자이므로 포인터 2 증가
-        }
-    }
-    return;
-}
-
-/**
- * @brief 콘솔에 문자열 포인터와 길이 사용하여 출력
- *
- *  @param cons: 콘솔 구조체 포인터
- * @param s: 출력할 문자열 포인터
- * @param l: 출력할 문자열 길이
- * @return: void
- */
-void cons_putstr1(struct CONSOLE *cons, char *s, int l)
-{
-    unsigned char *korean = (unsigned char *) *((int *) 0x0fe8);
-    unsigned short johab;
-    int i;
-
-    for (i=0; i<l; i++) {
-        if ((s[i] & 0x80) == 0) { // ASCII
-            cons_putchar(cons, s[i], 1);
-        } else if ((s[i] & 0xe0) == 0xe0) {
-            if (s[i+1] == 0 || s[i+2] == 0) break; // 문자열 끝 예외처리
-            johab = utf8_to_johab((unsigned char *) &s[i]);
-            if (johab != 0) {
-                // 한글 출력
-                if (cons->sht != 0) {
-                    put_johab(cons->sht->buf, cons->sht->bxsize, cons->cur_x, cons->cur_y, COL8_FFFFFF, korean, johab);
-                    sheet_refresh(cons->sht, cons->cur_x, cons->cur_y, cons->cur_x + 16, cons->cur_y + 16);
-                }
-                cons->cur_x += 16;
-
-                if (cons->cur_x + 16 > cons->sht->bxsize) {
-                    cons_newline(cons);
-                }
-            }
-            i += 2; // 3바이트 문자이므로 인덱스 2 증가
-        }
-    }
-    return;
-}
-
 /**
  * @brief 콘솔 줄바꿈 처리 함수
  * 
@@ -360,6 +280,7 @@ void cons_newline(struct CONSOLE *cons)
 	int x, y;
     struct SHEET *sht = cons->sht;
 	if (cons->cur_y < 28 + CONSOLE_TBOX_HEIGHT - 16) {
+        // cons_put_utf8(&cons, " ", 1, 0);
 		cons->cur_y += 16;
 	} else {
         // 스크롤
