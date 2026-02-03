@@ -1,6 +1,16 @@
 #ifndef _HANGUL_H_
 #define _HANGUL_H_
 // hangul.c
+
+struct TASK;
+struct CONSOLE;
+
+struct HANGUL {
+    int state;
+    int cho, jung, jong;
+    char buf[4];
+};
+
 void put_johab(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *font, unsigned short code);
 unsigned short utf8_to_johab(unsigned char *s);
 unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul);

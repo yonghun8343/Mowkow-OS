@@ -1,4 +1,5 @@
 // interrupt
+#include "../include/asmfunc.h"
 #include "../include/bootpack.h"
 #include <stdio.h>
 
