@@ -106,11 +106,7 @@ struct CONSOLE {
     int cmd_pos;
     struct TIMER *timer;
 };
-struct FILEHANDLE {
-    char *buf;
-    int size;
-    int pos;
-};
+
 void console_task(struct SHEET *sht, int memtotal, int langmode);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move);
