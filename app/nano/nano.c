@@ -403,7 +403,7 @@ filestruct *make_new_node(filestruct *prevnode)
 {
    filestruct *newnode;
 
-   newnode = api_malloc(sizeof(filestruct));
+   newnode = nano_malloc(sizeof(filestruct));
    newnode->data = 0;
    newnode->prev = prevnode;
    newnode->next = 0;
@@ -463,7 +463,7 @@ void do_enter(filestruct *inptr)
    new = make_new_node(inptr);
 
    tmp = &current->data[current_x];
-   new->data = api_malloc(my_strlen(tmp) + 2);
+   new->data = nano_malloc(my_strlen(tmp) + 2);
    strcpy(new->data, tmp);
    *tmp++ = '\n';
    *tmp = 0;
@@ -546,7 +546,7 @@ void HariMain(void)
    int win_width = COLS * 8 + 48;
    int win_height = LINES * 16 + 36;
    api_initmalloc();
-   char *winbuf = (char *)api_malloc(win_width * win_height);
+   char *winbuf = (char *)nano_malloc(win_width * win_height);
    int win;
 
    api_cmdline(s, 30);
