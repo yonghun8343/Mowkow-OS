@@ -235,7 +235,16 @@ void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move)
         }
     } else if (s[0] == 0x0a) { // 줄바꿈
         cons_newline(cons);
-    } else if (s[0] == 0x0d) { // 뭐 없음
+    } else if (s[0] == 0x08) {
+        if (cons->cur_x > 0) {
+            /* 커서를 한 칸(보통 8픽셀) 앞으로 당김 */
+            cons->cur_x -= 8;
+            
+            /* 만약 '지우는' 효과까지 필요하다면 아래 줄 추가 (공백으로 덮어쓰기) */
+            /* putfonts8_asc_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1); */
+        }
+    }
+     else if (s[0] == 0x0d) { // 뭐 없음
         // do nothing
     } else {
         int width = (len == 1) ? 8 : 16;
