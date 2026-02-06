@@ -2,7 +2,7 @@
 #include "parse.h"
 #include "eval.h"
 #include "error.h"
-#include <stdio.h>i
+#include <stdio.h>
 #include "../include/apilib.h" 
 
 void init_all() {
@@ -61,12 +61,12 @@ void load_file(Value* env, char* path) {
             /* 실행 중 에러 체크 */
             if (g_has_error) break;
 
-            // /* 결과 출력 (파이썬 코드와 동일하게 NIL이 아니면 출력) */
-            // /* 라이브러리 로딩 시 출력이 싫다면 이 부분을 주석 처리 */
-            // if (!is_nil(res)) {
-            //     print_value(res);
-            //     printf("\n");
-            // }
+            /* 결과 출력 (파이썬 코드와 동일하게 NIL이 아니면 출력) */
+            /* 라이브러리 로딩 시 출력이 싫다면 이 부분을 주석 처리 */
+            if (!is_nil(res)) {
+                print_value(res);
+                printf("\n");
+            }
         }
     }
 
