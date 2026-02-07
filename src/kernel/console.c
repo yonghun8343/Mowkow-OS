@@ -573,17 +573,23 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
     struct SHTCTL *shtctl;
     struct SHEET *sht;
     int i;
+    unsigned char c;
+    int has_dot = 0;
     
     for (i=0; i<13; i++) {
-        if (cmdline[i] <= ' ') {
+        c = (unsigned char)cmdline[i];
+        if (c <= ' ') {
             break;
         }
-        name[i] = cmdline[i];
+        name[i] = c;
+        if (c == '.') {
+            has_dot = 1;
+        }
     }
     name[i] = 0; // null-terminate
 
     finfo = file_search(name, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
-    if (finfo == 0 && name[i-1] != '.') {
+    if (finfo == 0 && has_dot == 0) {
         // search with .HRB extension
         name[i] = '.';
         name[i+1] = 'H';
