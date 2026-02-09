@@ -138,6 +138,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
                     set_hangul(task, 0, -1, -1, -1);    // 한글 오토마타 초기화
                 } else {
                     // 일반 문자 입출력
+                    if (i == 256 + 0x1D) continue; // 조합 문자 무시
                     if (cons.cmd_pos >= 255) continue; // 명령어 버퍼 오버플로우 방지
 
                     int key = i - 256;                      // 입력된 키 값 (ASCII 코드)
@@ -699,23 +700,19 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     int i;
     struct FILEINFO *finfo;
     struct FILEHANDLE *fh;
+    FDHANDLE *fd;
     struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 
-    if (edx == 1) {
-        // api_putchar()
+    if (edx == 1) { // api_putchar()
         cons_putchar(cons, eax & 0xff, 1);
-    } else if (edx == 2) {
-        // api_putstr(char *s)
+    } else if (edx == 2) { // api_putstr(char *s)
         cons_putstr(cons, (char *) ebx + ds_base);
-    } else if (edx == 3) {
-        // api_putstr_len(char *s, int l)
+    } else if (edx == 3) { // api_putstr_len(char *s, int l)
         int len = ecx;
         cons_put_utf8(cons, (char *) ebx + ds_base, len, 1);
-    } else if (edx == 4) {
-        // api_end()
+    } else if (edx == 4) { // api_end()
         return &(task->tss.esp0);
-    } else if (edx == 5) {
-        // api_openwin(char *buf, int xsiz, int ysiz, int col_inv, char *title)
+    } else if (edx == 5) { // api_openwin(char *buf, int xsiz, int ysiz, int col_inv, char *title)
         sht = sheet_alloc(shtctl);
         sht->task = task;
         sht->flags |= 0x10;
@@ -724,35 +721,35 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         sheet_slide(sht, ((shtctl->xsize - esi) / 2) & ~3, (shtctl->ysize - edi) / 2); // center and 4 pixel align (for optimization)
         sheet_updown(sht, shtctl->top);
         reg[7] = (int) sht;
-    } else if (edx == 6) {
+    } else if (edx == 6) { // api_putstrwin(int win, int x, int y, int col, int len, char *str)
         sht = (struct SHEET *) (ebx & 0xfffffffe);
         putfonts(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
         if ((ebx & 1) == 0) {
             sheet_refresh(sht, esi, edi, esi + ecx * 8, edi + 16);
         }
-    } else if (edx == 7) {
+    } else if (edx == 7) { // api_boxfilwin(int win, int x0, int y0, int x1, int y1, int cal)
         sht = (struct SHEET *) (ebx & 0xfffffffe);
         boxfill8(sht->buf, sht->bxsize, ebp, eax, ecx, esi, edi);
         if ((ebx & 1) == 0) {
             sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
         }
-    } else if (edx == 8) {
+    } else if (edx == 8) { // api_initmalloc(void)
         memman_init((struct MEMMAN *) (ebx + ds_base));
         ecx &= 0xfffffff0; // 16 byte align
         memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
-    } else if (edx == 9) {
+    } else if (edx == 9) { // api_malloc(int size)
         ecx = (ecx + 0x0f) & 0xfffffff0; // 16 byte align
         reg[7] = memman_alloc((struct MEMMAN *) (ebx + ds_base), ecx);
-    } else if (edx == 10) {
+    } else if (edx == 10) { // api_free(char *addr, int size)
         ecx = (ecx + 0x0f) & 0xfffffff0; // 16 byte align
         memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
-    } else if (edx == 11) {
+    } else if (edx == 11) { // api_point(int win, int x, int y, int col)
         sht = (struct SHEET *) (ebx & 0xfffffffe);
         sht->buf[sht->bxsize * edi + esi] = eax;
         if ((ebx & 1) == 0) {
             sheet_refresh(sht, esi, edi, esi + 1, edi + 1);
         }
-    } else if (edx == 12) {
+    } else if (edx == 12) { // api_refreshwin(int win, int x0, int y0, int x1, int y1)
         sht = (struct SHEET *) ebx;
         sheet_refresh(sht, eax, ecx, esi, edi);
     } else if (edx == 13) {
@@ -831,7 +828,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
             i = io_in8(0x61);
             io_out8(0x61, (i | 0x03) & 0x0f);
         }
-    } else if (edx == 21) {
+    } else if (edx == 21) { // int api_fopen(char *fname)
         for (i=0; i<8; i++) {
             if (task->fhandle[i].buf == 0) { break; }
         }
@@ -846,12 +843,13 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
                 fh->buf = file_loadfile_check_tek(finfo->clustno, &fh->size, task->fat);
             }
         }
-    } else if (edx == 22) {
+    } else if (edx == 22) { // api_fclose(int fhandle)
         fh = (struct FILEHANDLE *) eax;
         memman_free_4k(memman, (int) fh->buf, fh->size);
         fh->buf = 0;
-    } else if (edx == 23) {
+    } else if (edx == 23) { // api_fseek(int fhandle, int offset, int mode)
         fh = (struct FILEHANDLE *) eax;
+        
         if (ecx == 0) {
             fh->pos = ebx;
         } else if (ecx == 1) {
@@ -866,8 +864,10 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         if (fh->pos > fh->size) {
             fh->pos = fh->size;
         }
-    } else if (edx == 24) {
+        
+    } else if (edx == 24) { // api_fsize(int fhandle, int mode)
         fh = (struct FILEHANDLE *) eax;
+
         if (ecx == 0) {
             reg[7] = fh->size;
         } else if (ecx == 1) {
@@ -875,7 +875,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         } else if (ecx == 2) {
             reg[7] = fh->pos - fh->size;
         }
-    } else if (edx == 25) {
+    } else if (edx == 25) { // api_fread(char *buf, int maxsize, int fhandle)
         fh = (struct FILEHANDLE *) eax;
         for (i=0; i<ecx; i++) {
             if (fh->pos == fh->size) {
@@ -900,6 +900,34 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         reg[7] = i;
     } else if (edx == 27) {
         reg[7] = task->langmode;
+    } else if (edx == 28) { // api_fwrite(char *buf, int maxsize, int fhandle)
+        fh = (FDHANDLE *) eax;
+        char *buf = (char *) ebx + ds_base;
+        int size = ecx;
+
+        reg[7] = fd_write(fh, buf, size);
+    } else if (edx == 29) { // api_fopen_rw(char *fname, int mode)
+        fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));
+
+        int mode = ecx;
+
+        cons_putstr(cons, "[KERNEL] fopen request: \n");
+        cons_putstr(cons, (char *)ebx + ds_base);
+        cons_newline(cons);
+
+        int result = 0;
+        if (mode == 0) {
+            result = fd_open(fh, (char *)ebx + ds_base);
+        } else {
+            result = fd_writeopen(fh, (char *)ebx + ds_base);
+        }
+
+        if (result == 0) {
+            memman_free_4k(memman, (int)fh, sizeof(FDHANDLE));
+            reg[7] = 0;
+        } else {
+            reg[7] = (int)fh;
+        }
     }
 
     return 0;

@@ -573,28 +573,29 @@ void fd_close(FDHANDLE* fh)
         fh->finfo->size = fh->pos;
 
         // Update timestamp.
-        unsigned char t[5];
+        // unsigned char t[5];
         // int year = read_rtc(t);
         // fh->finfo->date = ((year - 1980) << 9) | ((t[0] - 1) << 5) | (t[1] - 1);
         // fh->finfo->time = (t[2] << 11) | (t[3] << 5) | (t[4] / 2);
 
         // Write back to floppy disk.
-        {
-        init_dma_w();
-        fdc_motor_on();
+        // {
+        // init_dma_w();
+        // fdc_motor_on();
 
-        sysPrints("FDC_WRITE\n");
-        if (!fdc_recalibrate()) {
-            sysPrints("[FDC][WRITE] recalibrate error\n");
-        } else {
-            if (!writeBack(fh, fatBits)) {
-                sysPrints("WRITE_BACK failed\n");
-            }
-        }
+        // sysPrints("FDC_WRITE\n");
+        // if (!fdc_recalibrate()) {
+        //     sysPrints("[FDC][WRITE] recalibrate error\n");
+        // } else {
+        //     if (!writeBack(fh, fatBits)) {
+        //         sysPrints("WRITE_BACK failed\n");
+        //     }
+        // }
 
-        fdc_motor_off();
-        }
-    } 
+        // fdc_motor_off();
+        // }
+        sysPrints("[RAM-DISK] File saved in Memory.\n");
+    }
     fh->finfo = 0;
 }
 
@@ -604,10 +605,14 @@ static void make_file_name83(char s[12], const char* name)
     int j = 0;
     int i;
     for (i = 0; j < 11 && name[i] != '\0'; ++i) {
-        if (name[i] == '.') {
+        char c = name[i];
+        if ('a' <= c && c <= 'z') {
+            c -= 0x20; 
+        }
+        if (c == '.') {
             j = 8;
         } else {
-            s[j++] = name[i];
+            s[j++] = c;
         }
     }
 }

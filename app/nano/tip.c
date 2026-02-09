@@ -29,6 +29,8 @@
 #include <string.h>
 #include <stdio.h>
 
+extern char answer[132];
+
 char *skipspace(char *p)
 {
    for (; *p==' '; p++) { }
@@ -187,58 +189,69 @@ void check_statblank(void)
 
 int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
 {
-   int kbinput = 0, j = 0;
-   char inputbuf[132] = "";
-   int len = 0;
+   int x = start_x;
+   int i = 0;
+   int key;
+   char str[2];
+   char debug_buf[20];
 
-   blank_statusbar();
    mvwaddstr(bottomwin, 0, 0, buf);
 
-   if (def != 0 && *def != 0) {
-      my_strcpy(answer, def);
-      my_strcpy(inputbuf, def);
-      waddstr(bottomwin, def);
-   }
+   answer[0] = 0;
    wrefresh(bottomwin);
 
 
-   while ((kbinput = wgetch(bottomwin)) != 13) {
-      for (j = 0; j <= slen - 1; j++) {
-         if (kbinput == s[j].val) {
-            my_strcpy(answer, "");
-            return s[j].val;
-         }
-      }
+   for (;;) {
+        wmove(bottomwin, 0, x);
+        wrefresh(bottomwin);
 
-      len = my_strlen(inputbuf);
+        key = wgetch(edit);
 
-      if (kbinput >= 32 && kbinput <= 126) {
-         if (len < 130) {
-            inputbuf[len] = (char)kbinput;
-            inputbuf[len + 1] = 0;
+        // 디버깅용
+      //   if (key != 0) {
+      //       sprintf(debug_buf, "[KEY:%3d]", key); 
+      //       // bottomwin의 0행 40열(화면 오른쪽)에 출력
+      //       mvwaddstr(bottomwin, 0, 40, debug_buf); 
+      //       wrefresh(bottomwin);
+            
+      //       // 커서를 다시 입력 위치로 원상복구
+      //       wmove(bottomwin, 0, x);
+      //   }
 
-            mvwaddstr(bottomwin, 0, 0, buf);
-            waddstr(bottomwin, inputbuf);
-            wrefresh(bottomwin);
-         }
-      } else if (kbinput == 127) {
-         if (len > 0) {
-            inputbuf[len - 1] = 0;
+        if (key == 13) {
+            answer[i] = 0; // 문자열 끝(NULL) 처리
+            return 0;      // 성공 리턴
+        }
 
-            blank_statusbar();
-            mvwaddstr(bottomwin, 0, 0, buf);
-            waddstr(bottomwin, inputbuf);
-            wrefresh(bottomwin);
-         }
-      }
-   }
+        if (key == 127 || key == 8) {
+            if (i > 0) {
+                i--;
+                x--;
+                mvwaddstr(bottomwin, 0, x, " ");
+                wmove(bottomwin, 0, x);
+                wrefresh(bottomwin);
+            }
+            continue;
+        }
 
-    my_strcpy(answer, inputbuf);
+        if (key == 27) { // ESC
+            return -1;
+        }
 
-    if (answer[0] == 0)
-       return -1;
-    else
-       return 0;
+        if (key >= 32 && key <= 126) {
+            if (i < 130) { // 버퍼 오버플로우 방지
+                answer[i] = key;
+                i++;
+                str[0] = key;
+                str[1] = 0;
+
+                mvwaddstr(bottomwin, 0, x, str);
+
+                x++;
+                wrefresh(bottomwin);
+            }
+        }
+    }
 }
 
 void horizbar(void *win, int y)
@@ -432,26 +445,14 @@ int statusq(shortcut s[], int slen, char *def, char *msg, ...)
 
    bottombars(s, slen); 
 
-   va_start(ap, msg);
-   // vsnprintf(foo, 132, msg, ap);
-   strncat(foo, ": ", 132);
-   va_end(ap);
+   foo[0] = '\0';
+   if (msg) strcpy(foo, msg);
+   strcat(foo, ": ");
 
    wattron(bottomwin, A_REVERSE);
-   ret = tipgetstr(foo, def, s, slen, (strlen(foo) + 3));
+
+   ret = tipgetstr(foo, def, s, slen, (strlen(foo)));
    wattroff(bottomwin, A_REVERSE);
-
-
-   switch (ret)
-   {
-
-      case TIP_FIRSTLINE_KEY:
-         do_first_line();
-         break;
-      case TIP_LASTLINE_KEY:
-         do_last_line();
-         break;
-   }
 
    /* Then blank the screen */
    blank_statusbar_refresh();
@@ -1419,64 +1420,56 @@ void wrap_reset(void)
       current->next->wrapline = 0;
 }
 
-// int write_file(char *name)
-// {
-//    long size, totsize = 0, linetemp = 0, lineswritten = 0;
-//    char input[2]; /* buffer */
-//    filestruct *fileptr;
+int write_file(char *name)
+{
+   int fh;
+   filestruct *fileptr = fileage;
+   int lineswritten = 0;
 
-//    titlebar();
-//    fileptr = fileage;
+   fh = api_fopen_rw(name, 1);
+   if (fh == 0) {
+      statusbar("Could not open file for writing");
+      return -1;
+   }
 
-//    if ((file = open(name, O_WRONLY | O_CREAT | O_TRUNC)) == -1)
-//    {
-//       statusbar("Could not open file for writing: %s", strerror(errno));
-//       return -1;
-//    }
+   statusbar("Writing...");
 
-//       dump_buffer(fileage);
-//       /* Read the entire file into file struct */
-//       while (fileptr != NULL)
-//       {
-//          size = write(file, fileptr->data, strlen(fileptr->data));
-//          if (size == -1)
-//          {
-//             statusbar("Could not open file for writing: %s",
-//                       strerror(errno));
-//             return -1;
-//          }
-//          else
-//          {
-// #ifdef DEBUG
-//             fprintf(stderr, "Wrote >%s", fileptr->data);
-// #endif
-//          }
-//          fileptr = fileptr->next;
-//          lineswritten++;
-//       }
+   while (fileptr != 0) {
+      int len = my_strlen(fileptr->data);
+      if (len > 0) {
+         api_fwrite(fileptr->data, len, fh);
+      }
 
-//    statusbar("Wrote %d lines", lineswritten);
-//    return 0;
-// }
+      fileptr = fileptr->next;
+      lineswritten++;
+   }
 
-// void do_writeout(void)
-// {
-//    int i;
 
-//    i = statusq(writefile_list, WRITEFILE_LIST_LEN, filename, 
-//                   "File Name to write");
-//    if (i != -1)
-//    {
+   api_fclose(fh);
 
-// #ifdef DEBUG
-//       fprintf(stderr, "filename is %s", answer);     
-// #endif
+   statusbar("Wrote %d lines", lineswritten);
+   return 0;
+}
 
-//       i = write_file(answer);
-//    }
+void do_writeout(void)
+{
+   int i;
 
-//    return;
-// }
+   i = statusq(writefile_list, WRITEFILE_LIST_LEN, filename, 
+                  "File Name to write");
+   if (i != -1)
+   {
+      if (write_file(answer) == 0) {
+         strncpy(filename, answer, 132);
+         modified = 0;
+         titlebar();
+         statusbar("Wrote to %s", filename);
+      }
+   }
+
+   bottombars(main_list, MAIN_LIST_LEN);
+   return;
+}
 
 void do_exit(int win)
 {
@@ -1488,7 +1481,7 @@ void do_exit(int win)
    i = do_yesno(0, "Save modified buffer (ANSWERING \"No\" WILL DESTROY CHANGES) ?");
 
    if (i == 1)
-      // do_writeout();
+      do_writeout();
 
    if (i != -1) 
       finish(win);
@@ -1545,7 +1538,7 @@ void HariMain(void)
    edit   = (void *)2;
    bottomwin = (void *)3;
 
-   // api_fopen(q);
+   api_fopen_rw(q, 1);
 
    global_init();
 
@@ -1624,7 +1617,7 @@ void HariMain(void)
             do_exit(win);
             break;
          case TIP_WRITEOUT_KEY:
-            // do_writeout();
+            do_writeout();
             bottombars(main_list, MAIN_LIST_LEN);
             break;
          case TIP_GOTO_KEY:
