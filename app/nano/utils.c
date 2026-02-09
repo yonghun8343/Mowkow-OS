@@ -20,7 +20,7 @@
 
 #include <string.h>
 
-#include "nano.h"
+#include "tip.h"
 #include "proto.h"
 #include "compat.h"
 #include "config.h"

@@ -37,6 +37,7 @@ void init_gdtidt(void)
     set_gatedesc(idt + 0x0d, (int) asm_inthandler0d, 2 * 8, AR_INTGATE32);              // 보호 예외 인터럽트
     set_gatedesc(idt + 0x20, (int) asm_inthandler20, 2 * 8, AR_INTGATE32);              // 타이머 인터럽트
     set_gatedesc(idt + 0x21, (int) asm_inthandler21, 2 * 8, AR_INTGATE32);              // 키보드
+    set_gatedesc(idt + 0x26, (int) asm_inthandler26, 2 * 8, AR_INTGATE32);              // FDC
     set_gatedesc(idt + 0x27, (int) asm_inthandler27, 2 * 8, AR_INTGATE32);              // PIC1에서 오는 IRQ-07(스퓨리어스 인터럽트)
     set_gatedesc(idt + 0x2c, (int) asm_inthandler2c, 2 * 8, AR_INTGATE32);              // 마우스
     set_gatedesc(idt + 0x40, (int) asm_hrb_api,      2 * 8, AR_INTGATE32 + 0x60);       // 소프트웨어 인터럽트(API 호출)

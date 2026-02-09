@@ -2,6 +2,7 @@
 
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
+#include "../include/fd.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -336,6 +337,8 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
         cmd_ncst(cons, cmdline, memtotal, cons->sht->task->langmode);
     } else if (strncmp(cmdline, "langmode ", 9) == 0 || strncmp(cmdline, "언어 ", 3) == 0) {
         cmd_langmode(cons, cmdline);
+    } else if (strncmp(cmdline, "touch ", 6) == 0) {
+        cmd_touch(cons, cmdline);
     } else if (cmdline[0] != 0) {			
         if (cmd_app(cons, fat, cmdline) == 0) {		
             if (cons->sht->task->langmode == 0) {
@@ -552,6 +555,39 @@ void cmd_langmode(struct CONSOLE *cons, char *cmdline)
         }
     }
     cons_newline(cons);
+    return;
+}
+
+void cmd_touch(struct CONSOLE *cons, char *cmdline)
+{
+    char filename[13];
+    char *content;
+    int i, j;
+    FDHANDLE fh;
+
+    unsigned char c;
+    for (i=6, j=0; i<30 && cmdline[i] != 0 && cmdline[i] != ' '; i++, j++) {
+        c = (unsigned char)cmdline[i];
+        if (c >= 'a' && c <= 'z') {
+            c -= 0x20; // 대문자로 변환
+        }
+        filename[j] = c;
+    }
+    filename[j] = 0; // null-terminate
+
+    if (filename[0] == 0) {
+        cons_putstr(cons, "Usage: touch [filename]\n");
+        return;
+    }
+
+    if (fd_writeopen(&fh, filename) == 0) {
+        cons_putstr(cons, "File open error.\n");
+        return;
+    }
+
+    fh.modified = 1;
+    fd_close(&fh);
+    cons_putstr(cons, "File created successfully.\n");
     return;
 }
 

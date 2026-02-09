@@ -18,7 +18,7 @@
  *                                                                        *
  **************************************************************************/
 
-#include "nano.h"
+#include "tip.h"
 
 int cur_x = 0, cur_y = 0;
 int center_x = 0, center_y = 0;		/* Center of screen */

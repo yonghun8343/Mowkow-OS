@@ -113,28 +113,7 @@ static void draw_view(struct HANGUL_STATE *h) {
         compose_utf8(buf, h->cho, h->jung, h->jong);
         api_putstr(buf);
         h->view_width = 2; // 한글은 백스페이스 2번(16px) 필요
-    } else { // 초성만 있으면 자음 낱자 출력
-        // 편의상 입력된 key가 아니라 초성 테이블 역참조 혹은 호환용 자음 사용이 원칙이나
-        // 여기서는 임시로 특수 처리 없이 처리해야 함. 
-        // 간단히: 초성만 있는 경우 해당 자음을 완성형 폰트나 ASCII로 매핑하기 복잡하므로
-        // 'ㄱ' 대신 완성형 코드로 매핑해 출력 시도
-        // (실제로는 초성용 낱자 코드가 따로 필요하지만, 여기선 완성형 '가'의 초성만 따올 수 없으므로 
-        //  단순 처리를 위해 '?' 등을 쓰거나, 커널 폰트 구조상 호환성 자음을 써야 함)
-        // -> [해결] 커널 hangul.c에는 낱자 처리가 없으나, 여기서는 그냥 'ㄱ'+'ㅏ' 조합인 척 화면엔 안그려질 수 있음.
-        // -> [대안] 초성만 있을 때 시각적 피드백을 위해 호환용 한글 자모(U+3131~)를 쓰거나 
-        //    단순히 조합중 표시를 함. 여기선 입력된 키 값 추적이 어려우므로 
-        //    state에 'last_input_key'를 저장하는 것이 가장 좋음.
-        //    하지만 구조체 수정 최소화를 위해 view_width=0으로 두고 넘어갈 수도 있음.
-        //    **개선**: 초성 매핑 테이블 역참조가 없으므로 화면엔 아무것도 안나올 수 있음.
-        //    하지만 사용자 입력을 돕기 위해 뭔가 나와야 함. 
-        //    일단은 한글 완성이 안되면 출력을 안하거나(waiting), 
-        //    커널이 해주는 방식(draw_composing_char)을 흉내낼 수 없음(VRAM 접근 불가).
-        //    => 따라서 API 레벨에서는 "완성된 글자"만 보여주는 게 나을 수도 있으나 답답함.
-        //    => 여기서는 "초성만 있을 땐 임시로 '?' 출력" 하거나 그냥 둠.
-        //    (더 좋은 방법: ㄱ=0x3131(UTF8 E3 84 B1) 출력)
-        
-        // *임시*: 초성만 있을 땐 그냥 둠 (화면에 안보임 -> 완성되면 촥 뜸)
-        // 만약 보이게 하려면 호환 자모 테이블이 필요함.
+    } else { 
     }
 }
 
@@ -214,10 +193,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
         case 1: // 초성
             if (u != -1) { h->state=2; h->jung=u; } // ㄱ+ㅏ=가
             else if (c != -1) { 
-                // ㄱ+ㄴ -> ㄱ 확정, ㄴ 시작
-                // 1. 현재 상태(ㄱ)는 완성형이 아니므로 flush시 증발할 수 있음.
-                //    완벽하려면 여기서 'ㄱ'을 호환자모로 flush 해줘야 함.
-                // 2. 새 상태 시작
                 h->state=1; h->cho=c; 
             }
             break;
@@ -227,9 +202,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                 int comp = get_composite_jung(h->jung, u);
                 if (comp != -1) { h->jung = comp; } // ㅗ+ㅏ=ㅘ
                 else {
-                    // 가+ㅓ -> '가' flush, 'ㅓ' 처리
-                    // 여기서 flush_state를 호출하면 h가 초기화되므로
-                    // 수동으로 버퍼에 넣고 리셋해야 함
                     char utf8[4];
                     int len = compose_utf8(utf8, h->cho, h->jung, h->jong);
                     int i;
@@ -237,8 +209,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                     api_putstr(utf8); // 화면에 확정 출력
 
                     h->state=0; h->cho=-1; h->jung=-1; h->jong=-1; h->view_width=0;
-                    // 새 모음 처리 (모음 단독이라 또 증발 위기)
-                    // -> 오토마타 특성상 모음 단독 처리는 까다로움.
                 }
             } else if (c != -1) {
                 // 가+ㄱ (종성 아님, 초성으로 옴) -> '가' flush, 'ㄱ' 시작

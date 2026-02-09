@@ -20,7 +20,7 @@
 
 /* Externs */
 
-#include "nano.h"
+#include "tip.h"
 
 extern int center_x, center_y, file, modified, editwinrows, editwineob;
 extern int current_x, current_y, posible_max, keep_cutbuffer, totlines;

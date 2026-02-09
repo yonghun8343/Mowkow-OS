@@ -1,7 +1,7 @@
 #ifndef _COMPAT_H_
 #define _COMPAT_H_
 
-#include "nano.h"
+#include "tip.h"
 
 #define mvwaddstr(win, y, x, str) { wmove(win, y, x); waddstr(win, str); }
 #define mvwaddch(win, y, x, ch)   { wmove(win, y, x); waddch(win, ch); }
@@ -33,12 +33,16 @@ void wmove(void *win, int y, int x);
 void waddstr(void *win, char *str);
 void waddch(void *win, int c);
 void wrefresh(void *win);
+void wrefresh_rows(int start_row, int end_row) ;
 void wattron(void *win, int attr);
 void wattroff(void *win, int attr);
+void endwin(int win);
+void redrawin(int win);
 int my_strlen(char *str);
 int my_tolower(int c);
 char *my_strcpy(char *dest, const char *src);
 char *my_strncpy(char *dest, char *src, int n);
 char *my_strstr(char *haystack, char *needle);
+int my_atoi(char *str);
 
 #endif  /* _COMPAT_H_ */

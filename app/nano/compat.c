@@ -1,7 +1,8 @@
 #include "compat.h"
-#include "nano.h"
+#include "tip.h"
 #include "proto.h"
 #include "../include/apilib.h"
+#include "../include/mylib.h"
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -15,6 +16,9 @@ extern void *bottomwin;
 
 extern int cur_x;
 extern int cur_y;
+
+extern char *winbuf_global;
+extern int win_width_global;
 
 int ctrl_pressed = 0;
 
@@ -116,23 +120,25 @@ void waddstr(void *win, char *str)
 {
     int px = cur_x * 8 + 8;
     int py = cur_y * 16 + 28;
-    int len = 0;
-    char *p = str;
-    while(*p++) {
-        len++;
-    }
+    int len = my_strlen(str);
 
-    int bg_col, txt_col;
-
-    if (reverse_mode == 0) {
-        bg_col = 0;
-        txt_col = 7;
-    } else {
-        bg_col = 7;
-        txt_col = 0;
+    int bg_col = (reverse_mode) ? 7 : 0;  
+    int txt_col = (reverse_mode) ? 0 : 7;
     
+    int rect_h = 16;
+    int rect_w = len * 8;
+
+    if (winbuf_global != 0) {
+        int h, w;
+        for (h = 0; h < rect_h; h++) {
+            int offset = (py + h) * win_width_global + px;
+
+            for (w = 0; w < rect_w; w++) {
+                winbuf_global[offset + w] = (char)bg_col;
+            }
+        }
     }
-    api_boxfilwin(current_win, px, py, px + len*8, py + 16, bg_col);
+
     api_putstrwin(current_win, px, py, txt_col, len, str);
 
     cur_x += len;
@@ -150,6 +156,20 @@ void wrefresh(void *win)
     api_refreshwin(current_win, 0, 0, 700, 450);
 }
 
+void wrefresh_rows(int start_row, int end_row) 
+{
+    int top_margin = 28; 
+    int line_height = 16;
+    
+    int y0 = top_margin + start_row * line_height;
+    int y1 = top_margin + (end_row + 1) * line_height; 
+
+    if (y0 < 0) y0 = 0;
+    if (y1 > 450) y1 = 450; 
+
+    api_refreshwin(current_win, 0, y0, 700, y1);
+}
+
 void wattron(void *win, int attr) {
     if (attr == 1) reverse_mode = 1;
     return;
@@ -158,6 +178,14 @@ void wattron(void *win, int attr) {
 void wattroff(void *win, int attr) {
     if (attr == 1) reverse_mode = 0;
     return;
+}
+
+void endwin(int win) {
+    api_closewin(win);
+}
+
+void redrawin(int win) {
+    api_refreshwin(current_win, 0, 0, 700, 450);
 }
 
 int my_strlen(char *str) {
@@ -214,4 +242,13 @@ char *my_strstr(char *haystack, char *needle) {
         }
     }
     return 0;
+}
+
+int my_atoi(char *str) {
+    int res = 0;
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (*str - '0');
+        str++;
+    }
+    return res;
 }

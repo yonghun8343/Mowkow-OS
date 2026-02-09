@@ -114,6 +114,7 @@ struct FILEHANDLE {
 void console_task(struct SHEET *sht, int memtotal, int langmode);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move);
+void cons_putstr(struct CONSOLE *cons, char *s);
 void cons_newline(struct CONSOLE *cons);
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal);
 void cmd_mem(struct CONSOLE *cons, int memtotal);

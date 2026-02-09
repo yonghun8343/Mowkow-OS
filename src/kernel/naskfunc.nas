@@ -14,12 +14,14 @@
 	GLOBAL	_load_cr0, _store_cr0
 	GLOBAL	_load_tr
 	GLOBAL	_asm_inthandler20, _asm_inthandler21
+    GLOBAL  _asm_inthandler26
 	GLOBAL	_asm_inthandler27, _asm_inthandler2c
     GLOBAL  _asm_inthandler0c, _asm_inthandler0d
 	GLOBAL	_asm_end_app, _memtest_sub
 	GLOBAL	_farjmp, _farcall
 	GLOBAL	_asm_hrb_api, _start_app
 	EXTERN	_inthandler20, _inthandler21
+    EXTERN  _inthandler26
 	EXTERN	_inthandler27, _inthandler2c
     EXTERN  _inthandler0c, _inthandler0d
 	EXTERN	_hrb_api
@@ -140,6 +142,22 @@ _asm_inthandler21:
     MOV     DS, AX
     MOV     ES, AX
     CALL    _inthandler21
+    POP     EAX
+    POPAD
+    POP     DS
+    POP     ES
+    IRETD
+
+_asm_inthandler26:
+    PUSH    ES
+    PUSH    DS
+    PUSHAD
+    MOV     EAX, ESP
+    PUSH    EAX
+    MOV     AX, SS
+    MOV     DS, AX
+    MOV     ES, AX
+    CALL    _inthandler26
     POP     EAX
     POPAD
     POP     DS

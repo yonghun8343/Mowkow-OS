@@ -1,5 +1,5 @@
-#ifndef _NANO_H_
-#define _NANO_H_
+#ifndef _TIP_H_
+#define _TIP_H_
 
 #define COLORS          8
 #define COLOR_PAIRS     64
@@ -82,4 +82,8 @@ typedef struct shortcut {
    char desc[50];       /* Description, e.g. "Page Up" */
 } shortcut;
 
-#endif  /* _NANO_H_ */
+void insert_char_at_cursor(int key);
+void delete_char_at_cursor();
+void update_line(filestruct *fileptr);
+
+#endif  /* _TIP_H_ */
