@@ -1507,6 +1507,22 @@ void do_exit(int win)
 
 }
 
+void do_tab(void)
+{
+   int i;
+   for (i=0; i<4; i++) {
+      insert_char_at_cursor(' ');
+   }
+
+   update_line(current);
+   wrefresh(edit);
+
+   if (!modified) {
+      modified = 1;
+      titlebar();
+   }
+}
+
 void tip_writer(const char *str, void *aux)
 {
    if (str[0] == 0x08) {
@@ -1593,7 +1609,7 @@ void HariMain(void)
             if (lang_mode == 1) apihan_init(&h_state, tip_writer, 0);
             lang_mode ^= 1;
             break;
-         case 127:
+         case 127:   // backspace
             if (lang_mode == 1 && h_state.state > 0) {
                commit_state(&h_state);
                do_backspace();
@@ -1606,6 +1622,10 @@ void HariMain(void)
          case 13:
             if (lang_mode == 1) commit_state(&h_state);
             do_enter(current);
+            break;
+         case 0xFE:     // tab
+            if (lang_mode == 1) commit_state(&h_state);
+            do_tab();
             break;
          case 8:
             if (lang_mode == 1) commit_state(&h_state);

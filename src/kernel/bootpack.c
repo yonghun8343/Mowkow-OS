@@ -222,13 +222,14 @@ void HariMain(void)
                     fifo32_put(&key_win->task->fifo, s[0] + 256);
                 }
 				if (i == 256 + 0x0f && key_win != 0) { // tab 키 눌림
-					keywin_off(key_win);
-					j = key_win->height - 1;
-					if (j == 0) {
-						j = shtctl->top - 1;
-					}
-					key_win = shtctl->sheets[j];
-					keywin_on(key_win);
+					// keywin_off(key_win);
+					// j = key_win->height - 1;
+					// if (j == 0) {
+					// 	j = shtctl->top - 1;
+					// }
+					// key_win = shtctl->sheets[j];
+					// keywin_on(key_win);
+					fifo32_put(&key_win->task->fifo, 0xFE + 256);
 				}
 				if (i == 256 + 0x2a) { // left shift 눌림
 					key_shift |= 1;
