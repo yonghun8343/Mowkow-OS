@@ -485,6 +485,7 @@ int do_yesno(int all, char *msg, ...)
    
    va_start(ap, msg);
    // vsnprintf(foo, 132, msg, ap);
+   mini_vsnprintf(foo, 132, msg, ap);
    va_end(ap);
    wattron(bottomwin, A_REVERSE);
    mvwaddstr(bottomwin, 0, 0, foo);
@@ -1456,6 +1457,7 @@ int write_file(char *name)
       if (len > 0) {
          api_fwrite(fileptr->data, len, fh); // 데이터는 fileptr에 있고, 같이 넘겨주는게 fh다
       }
+      statusbar("333");
 
       fileptr = fileptr->next;
       lineswritten++;
@@ -1503,6 +1505,21 @@ void do_exit(int win)
    if (i != -1) 
       finish(win);
 
+}
+
+void tip_writer(const char *str, void *aux)
+{
+   if (str[0] == 0x08) {
+      delete_char_at_cursor();
+   } else {
+      int i;
+      for (i=0; str[i] != 0; i++) {
+         insert_char_at_cursor(str[i]);
+      }
+   }
+
+   update_line(current);
+   wrefresh(edit);
 }
 
 char *winbuf_global;
@@ -1563,14 +1580,17 @@ void HariMain(void)
    api_refreshwin(win, 0, 0, win_width, win_height);
    
    hangul_init(&h_state);
+   // apihan_init(&h_state, tip_writer, 0);
    lang_mode = 1; // 한글 모드로 시작
 
    for (;;) {
       int key = wgetch(edit);
+      // char dummy_buf[10]; // apihan_run이 요구하는 버퍼 (tip은 콜백 쓰므로 무시됨)
+      // int dummy_pos = 0;
 
       switch(key) {
          case 0xFF:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) apihan_init(&h_state, tip_writer, 0);
             lang_mode ^= 1;
             break;
          case 127:
@@ -1580,6 +1600,8 @@ void HariMain(void)
             } else {
                do_backspace();
             }
+            // apihan_backspace(&h_state, dummy_buf, &dummy_pos);
+            // if (!modified) { modified = 1; titlebar(); }
             break;
          case 13:
             if (lang_mode == 1) commit_state(&h_state);
@@ -1683,6 +1705,7 @@ void HariMain(void)
                wrefresh_rows(current_y, current_y);
             } else {
                hangul_process_key(&h_state, key);
+               // apihan_run(&h_state, key, dummy_buf, &dummy_pos);
             }
             if (!modified) {
                modified = 1;

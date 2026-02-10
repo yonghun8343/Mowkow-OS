@@ -989,13 +989,6 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         char *buf = (char *) ebx + ds_base;
         int size = ecx;
 
-        char c[10];
-        for (i=0; i<size; i++) {
-            c[i] = buf[i];
-        }
-        c[i] = '\0';
-        cons_putstr(cons, c);
-
         reg[7] = fd_write(fh, buf, size);
     } else if (edx == 29) { // api_fopen_rw(char *fname, int mode)
         FDHANDLE *fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));

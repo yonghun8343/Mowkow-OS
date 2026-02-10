@@ -30,7 +30,7 @@ static unsigned int fdc_wait_interrupt()
     while (!fdc_chk_interrupt()) {
         timeout--;
         if (timeout == 0) {
-            sysPrints("\n[PANIC] FDC Interrupt Timeout!\n");
+            // sysPrints("\n[PANIC] FDC Interrupt Timeout!\n");
             return 0; // timeout
         }
     }
@@ -45,7 +45,7 @@ static void fdc_clear_interrupt()
 // IRQ-06 : FDC
 void inthandler26(int *esp) 
 {
-    sysPrints("IRQ6 ");
+    // sysPrints("IRQ6 ");
     ++fdc_interrupt;
     io_out8(PIC0_OCW2, 0x66);  // Notify IRQ-06 recv finish to PIC0
     return;
@@ -421,13 +421,13 @@ int fdc_write(void* buf, int head, int cyl, int sector)
     init_dma_w();
     fdc_motor_on();
 
-    sysPrints("FDC_WRITE\n");
+    // sysPrints("FDC_WRITE\n");
     if (!fdc_recalibrate()) {
         sysPrints("[FDC][WRITE] recalibrate error\n");
         return 0;
     }
 
-    sysPrints("SEEK\n");
+    // sysPrints("SEEK\n");
     if (!fdc_seek(cyl)) {
         sysPrints("[FDC][WRITE] seek error\n");
         return 0;
@@ -449,7 +449,7 @@ int fdc_write(void* buf, int head, int cyl, int sector)
 
     fdc_clear_interrupt();
 
-    sysPrints("WRITE\n");
+    // sysPrints("WRITE\n");
     if (!fdc_cmd(cmd, sizeof(cmd))) {
         sysPrints("[FDC][WRITE] cmd error\n");
         return 0;
@@ -464,7 +464,7 @@ int fdc_write(void* buf, int head, int cyl, int sector)
         sysPrints("[FDC][WRITE] read result error\n");
         return 0;
     }
-    sysPrints("WRITE OK\n");
+    // sysPrints("WRITE OK\n");
 
     fdc_motor_off();
     return 1;
@@ -795,6 +795,10 @@ int fd_write(FDHANDLE* fh, const void* srcData, int requestSize) {
         }
     }
 
+    char debug[64];
+    sprintf(debug, "Source: %x, Cluster: %x, Pos: %d, RS: %d\n", (int)src, fh->cluster, fh->pos, requestSize);
+    sysPrints(debug);
+
     while (requestSize > 0) {
         int offset_in_cluster = fh->pos % CLUSTER_SIZE;
         int bytes_available = CLUSTER_SIZE - offset_in_cluster;
@@ -802,6 +806,17 @@ int fd_write(FDHANDLE* fh, const void* srcData, int requestSize) {
         int chunk = (requestSize < bytes_available) ? requestSize : bytes_available;
 
         unsigned char* dst = clusterData(fh->cluster) + offset_in_cluster;
+        char debug[64];
+        // dst(목적지), src(소스), chunk(크기), cluster(현재 클러스터) 모두 출력
+        sprintf(debug, "WR: dst=%08X, src=%08X, len=%d, clus=%d\n", 
+                (int)dst, (int)src, chunk, fh->cluster);
+        sysPrints(debug);
+
+        // [안전장치] 만약 dst가 GDT 영역(0x270000) 근처라면 강제 정지!
+        if ((int)dst >= 0x00260000 && (int)dst <= 0x00280000) {
+            sysPrints("[CRITICAL] DETECTED GDT OVERWRITE! STOPPING.\n");
+            for(;;) io_hlt(); // 여기서 멈춰서 로그 확인
+        }
         memcpy(dst, src, chunk);
 
         fh->pos += chunk;

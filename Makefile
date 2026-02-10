@@ -130,7 +130,7 @@ $(IMG_DIR)/haribote.img : $(BUILD_DIR)/boot/ipl.bin $(BUILD_DIR)/haribote.sys $(
 
 # Commands
 run: $(IMG_DIR)/haribote.img
-	$(QEMU) -fda $(IMG_DIR)/haribote.img -no-reboot -d int
+	$(QEMU) -fda $(IMG_DIR)/haribote.img -no-reboot -d int -m 512M
 
 clean:
 	$(DEL) $(BUILD_DIR) $(IMG_DIR)
