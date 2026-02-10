@@ -35,7 +35,7 @@ file_error:
 	api_boxfilwin(win, 8, 60, 247,  76, 7);
 	api_boxfilwin(win, 6, 86, 249, 105, 7);
 
-	i = api_fopen(p);
+	i = api_fopen(p, 0);
 	if (i == 0) {
 		goto file_error;
 	}

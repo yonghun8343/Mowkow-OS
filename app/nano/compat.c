@@ -33,14 +33,17 @@ int wgetch(void *win)
             ctrl_pressed = 1;
             continue;
         }
-        if (key >= 'a' && key <= 'z') {
-            if (ctrl_pressed) {
+        if (ctrl_pressed) {
+            if (key >= 'a' && key <= 'z') {
                 // Ctrl + a(97) -> 1 (Control_A)
                 // 공식: 키값 - 'a' + 1
                 ctrl_pressed = 0; // Reset Ctrl State
                 return key - 'a' + 1; 
             }
-            return key;
+            if (key == 'c' || key == 'C') {
+                ctrl_pressed = 0; // Reset Ctrl State
+                return 3; // Control_C
+            }
         }
 
         if (key == 0x0A) {
@@ -51,6 +54,7 @@ int wgetch(void *win)
             return 127;
         }
         
+        ctrl_pressed = 0; // Reset Ctrl State if no Ctrl combination matched
         return key;
     }
 }

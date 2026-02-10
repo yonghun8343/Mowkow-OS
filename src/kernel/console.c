@@ -123,7 +123,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
 					cmdline[cons.cmd_pos] = 0;            // 명령어 라인 종료 문자
                     cons.cmd_pos = 0;
 
-                    // cons_debug(&cons, cmdline);    // 디버그용
+                    cons_debug(&cons, cmdline);    // 디버그용
                     
                     cons_newline(&cons);                        // 줄바꿈
                     cons_runcmd(cmdline, &cons, fat, memtotal); // 명령어 실행
@@ -131,7 +131,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
                         cmd_exit(&cons, fat);                   // 콘솔 태스크 종료
                     }
                     cons_put_utf8(&cons, ">", 1, 1);                // 프롬프트 출력
-				} else if (i == 256 + 0x3b) {	// F1 눌림
+				} else if (i == 0xFF) {	// Shift + Space
                     // 언어 모드 변경
                     task->langmode ^= 1;
                     flush_hangul_to_cmdline(&cons, task, cmdline); // 조합 중인 한글 확정
@@ -592,6 +592,19 @@ void cmd_touch(struct CONSOLE *cons, char *cmdline)
     return;
 }
 
+typedef struct HrbHeader {
+    unsigned int segsiz;  // 코드 + 데이터 세그먼트 크기
+    char signature[4]; // "Hari" 고유 시그니처
+    unsigned int reserved; // 예약 필드 (정렬 위함)
+    unsigned int esp;     // 초기 ESP 값
+    unsigned int datsiz;  // 데이터 세그먼트 크기
+    unsigned int datadr;  // 데이터 세그먼트의 .hrb 파일 내 위치
+    int jump;
+    unsigned int entry;   // 진입점 주소 (파일 내 위치)
+    unsigned int headadr;
+    int dummy[3];
+} HrbHeader;
+
 /**
  * @brief 애플리케이션 실행 명령어 처리 함수
  *
@@ -602,78 +615,125 @@ void cmd_touch(struct CONSOLE *cons, char *cmdline)
  */
 int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 {
-    struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
-    struct FILEINFO *finfo;
-    char name[18], *p, *q;
-    struct TASK *task = task_now();
-    int segsiz, datsiz, esp, dathrb, appsiz; // metadata of .hrb file
-    struct SHTCTL *shtctl;
-    struct SHEET *sht;
+    char name[13];
     int i;
-    unsigned char c;
-    int has_dot = 0;
-    
     for (i=0; i<13; i++) {
-        c = (unsigned char)cmdline[i];
+        unsigned char c = (unsigned char)cmdline[i];
         if (c <= ' ') {
             break;
         }
         name[i] = c;
-        if (c == '.') {
-            has_dot = 1;
-        }
     }
     name[i] = 0; // null-terminate
 
-    finfo = file_search(name, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
-    if (finfo == 0 && has_dot == 0) {
-        // search with .HRB extension
-        name[i] = '.';
-        name[i+1] = 'H';
-        name[i+2] = 'R';
-        name[i+3] = 'B';
-        name[i+4] = 0;
-        finfo = file_search(name, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+    FDHANDLE fh;
+    if (!fd_open(&fh, name)) {
+        // .HRB 확장자 붙여서 다시 시도
+        if (strlen(name) <= 8) {
+            name[i] = '.';
+            name[i+1] = 'H';
+            name[i+2] = 'R';
+            name[i+3] = 'B';
+            name[i+4] = 0;
+            if (!fd_open(&fh, name)) {
+                return 0; // 파일 못 찾음
+            }
+        }
     }
 
-    if (finfo != 0) {
-        appsiz = finfo->size;
-        p = file_loadfile_check_tek(finfo->clustno, &appsiz, fat);
-        if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
-            segsiz = *((int *) (p + 0x0000));
-            esp    = *((int *) (p + 0x000c));
-            datsiz = *((int *) (p + 0x0010));
-            dathrb = *((int *) (p + 0x0014));
-            q = (char *) memman_alloc_4k(memman, segsiz);
-            task->ds_base = (int) q;
-            set_segmdesc(task->ldt + 0, finfo->size - 1, (int) p, AR_CODE32_ER + 0x60);
-            set_segmdesc(task->ldt + 1, segsiz - 1,      (int) q, AR_DATA32_RW + 0x60);
-            for (i=0; i<datsiz; i++) {
-                q[esp + i] = p[dathrb + i];
-            }
-            start_app(0x1b, 0 * 8 + 4, esp, 1 * 8 + 4, &(task->tss.esp0));
-            shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
-            for (i=0; i<MAX_SHEETS; i++) {
-                sht = &(shtctl->sheets0[i]);
-                if ((sht->flags & 0x11) == 0x11 && sht->task == task) {
-                    sheet_free(sht);
-                }
-            }
-            for (i=0; i<8; i++) {
-                if (task->fhandle[i].buf != 0) {
-                    memman_free_4k(memman, (int) task->fhandle[i].buf, task->fhandle[i].size);
-                    task->fhandle[i].buf = 0;
-                }
-            }
-            timer_cancelall(&task->fifo);
-            memman_free_4k(memman, (int) q, segsiz);
-        } else {
-            cons_putstr(cons, ".hrb file format error.\n");
+    int file_size = fh.finfo->size;
+    struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+    char *file_buf = (char *)memman_alloc_4k(memman, file_size);
+
+    fd_read(&fh, file_buf, file_size);
+    fd_close(&fh);
+
+    char *exec_buf;
+    int exec_size;
+
+    if (file_size >= 4 && strncmp(file_buf + 4, "Hari", 4) == 0) {
+        exec_buf = file_buf;
+        exec_size = file_size;
+    } else {
+        // 압축된 앱 압축 해제 후 파일 처리
+        if (file_size < 17) {
+            cons_putstr(cons, "Invalid .hrb file format.\n");
+            memman_free_4k(memman, (int) file_buf, file_size);
+            return 0;
         }
-        memman_free_4k(memman, (int) p, appsiz);
-        cons_newline(cons);
-        return 1;
+
+        int decomp_size = tek_getsize((unsigned char *)file_buf);
+        if (decomp_size > 0) {
+            exec_buf = (char *)memman_alloc_4k(memman, decomp_size);
+            tek_decomp((unsigned char *)file_buf, (unsigned char *)exec_buf, decomp_size);
+            memman_free_4k(memman, (int) file_buf, file_size);
+
+            if (strncmp(exec_buf + 4, "Hari", 4) != 0) {
+                cons_putstr(cons, "Invalid .hrb file format.\n");
+                memman_free_4k(memman, (int) exec_buf, decomp_size);
+                return 0;
+            }
+            exec_size = decomp_size;
+        } else {
+            cons_putstr(cons, "File decompression error.\n");
+            memman_free_4k(memman, (int) file_buf, file_size);
+            return 0;
+        }
     }
+    
+
+    HrbHeader header = *(HrbHeader *)(exec_buf);
+
+    char *data_seg = (char *)memman_alloc_4k(memman, header.segsiz);
+
+    struct TASK *task = task_now();
+    task->ds_base = (int) data_seg;
+
+    memcpy(data_seg + header.esp, exec_buf + header.datadr, header.datsiz);
+    
+    int data_end_offset = header.esp + header.datsiz;
+    if (data_end_offset < header.segsiz) memset(data_seg + data_end_offset, 0, header.segsiz - data_end_offset); // BSS 영역 0으로 초기화
+
+    set_segmdesc(task->ldt + 0, exec_size - 1, (int) exec_buf, AR_CODE32_ER + 0x60);
+    set_segmdesc(task->ldt + 1, header.segsiz - 1, (int) data_seg, AR_DATA32_RW + 0x60);
+    start_app(0x1B, 0 * 8 + 4, header.esp, 1 * 8 + 4, &(task->tss.esp0));
+
+    struct SHTCTL *shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
+    for (i=0; i<MAX_SHEETS; ++i) {
+        struct SHEET *sht = &shtctl->sheets0[i];
+        if ((sht->flags & 0x11) == 0x11 && sht->task == task) {
+            sheet_free(sht);
+        }
+    }
+
+    for (i=0; i<task->fhandle_count; ++i) { fd_close(&task->fhandle[i]); }
+    timer_cancelall(&task->fifo);
+
+    memman_free_4k(memman, (int) exec_buf, exec_size);
+    memman_free_4k(memman, (int) data_seg, header.segsiz);
+    return 1;
+}
+
+static FDHANDLE *_api_fopen(struct TASK *task, const char* filename, int flag)
+{
+    FDHANDLE *fh = 0;
+    int i;
+    for (i=0; i<task->fhandle_count; ++i) {
+        if (task->fhandle[i].finfo == 0) {
+            fh = &task->fhandle[i];
+            break;
+        }
+    }
+
+    if (fh == 0) return 0;
+
+    if (flag & 1) {
+        if (fd_writeopen(fh, filename)) return fh;
+    } else {
+        if (fd_open(fh, filename)) return fh;
+    }
+
+    fh->finfo = 0; // 실패 시 핸들 초기화
     
     return 0;
 }
@@ -699,8 +759,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     // reg[4] : ebx, reg[5] : edx, reg[6] : ecx, reg[7] : eax
     int i;
     struct FILEINFO *finfo;
-    struct FILEHANDLE *fh;
-    FDHANDLE *fd;
+    // struct FILEHANDLE *fh;
+    // FDHANDLE *fd;
     struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 
     if (edx == 1) { // api_putchar()
@@ -770,8 +830,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         }
     } else if (edx == 14) {
         sheet_free((struct SHEET *) ebx);
-    } else if (edx == 15) {
-        // api_getkey(int mode)
+    } else if (edx == 15) { // api_getkey(int mode)
         for (;;) {
             io_cli();
             if (fifo32_status(&task->fifo) == 0) {
@@ -829,62 +888,87 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
             io_out8(0x61, (i | 0x03) & 0x0f);
         }
     } else if (edx == 21) { // int api_fopen(char *fname)
-        for (i=0; i<8; i++) {
-            if (task->fhandle[i].buf == 0) { break; }
-        }
-        fh = &task->fhandle[i];
-        reg[7] = 0;
-        if (i < 8) {
-            finfo = file_search((char *) ebx + ds_base, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
-            if (finfo != 0) {
-                reg[7] = (int) fh;
-                fh->size = finfo->size;
-                fh->pos = 0;
-                fh->buf = file_loadfile_check_tek(finfo->clustno, &fh->size, task->fat);
-            }
-        }
+        const char* filename = (char *) ebx + ds_base;
+        
+        // cons_putstr(cons, filename);
+
+        int flag = eax;
+
+        reg[7] = (int)_api_fopen(task, filename, flag);
+
+        // for (i=0; i<8; i++) {
+        //     if (task->fhandle[i].buf == 0) { break; }
+        // }
+        // fh = &task->fhandle[i];
+        // reg[7] = 0;
+        // if (i < 8) {
+        //     finfo = file_search((char *) ebx + ds_base, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+        //     if (finfo != 0) {
+        //         reg[7] = (int) fh;
+        //         fh->size = finfo->size;
+        //         fh->pos = 0;
+        //         fh->buf = file_loadfile_check_tek(finfo->clustno, &fh->size, task->fat);
+        //     }
+        // }
     } else if (edx == 22) { // api_fclose(int fhandle)
-        fh = (struct FILEHANDLE *) eax;
-        memman_free_4k(memman, (int) fh->buf, fh->size);
-        fh->buf = 0;
+        // fh = (struct FILEHANDLE *) eax;
+        // memman_free_4k(memman, (int) fh->buf, fh->size);
+        // fh->buf = 0;
+        FDHANDLE *fh = (FDHANDLE *) eax;
+        fd_close(fh);
     } else if (edx == 23) { // api_fseek(int fhandle, int offset, int mode)
-        fh = (struct FILEHANDLE *) eax;
+        // fh = (struct FILEHANDLE *) eax;
         
-        if (ecx == 0) {
-            fh->pos = ebx;
-        } else if (ecx == 1) {
-            fh->pos += ebx;
-        } else if (ecx == 2) {
-            fh->pos = fh->size + ebx;
-        }
+        // if (ecx == 0) {
+        //     fh->pos = ebx;
+        // } else if (ecx == 1) {
+        //     fh->pos += ebx;
+        // } else if (ecx == 2) {
+        //     fh->pos = fh->size + ebx;
+        // }
 
-        if (fh->pos < 0) {
-            fh->pos = 0;
-        }
-        if (fh->pos > fh->size) {
-            fh->pos = fh->size;
-        }
-        
+        // if (fh->pos < 0) {
+        //     fh->pos = 0;
+        // }
+        // if (fh->pos > fh->size) {
+        //     fh->pos = fh->size;
+        // }
+        FDHANDLE *fh = (FDHANDLE *)eax;
+        int origin = ecx;
+        int offset = ebx;
+        fd_seek(fh, offset, origin);
     } else if (edx == 24) { // api_fsize(int fhandle, int mode)
-        fh = (struct FILEHANDLE *) eax;
+        // fh = (struct FILEHANDLE *) eax;
 
-        if (ecx == 0) {
-            reg[7] = fh->size;
-        } else if (ecx == 1) {
-            reg[7] = fh->pos;
-        } else if (ecx == 2) {
-            reg[7] = fh->pos - fh->size;
+        // if (ecx == 0) {
+        //     reg[7] = fh->size;
+        // } else if (ecx == 1) {
+        //     reg[7] = fh->pos;
+        // } else if (ecx == 2) {
+        //     reg[7] = fh->pos - fh->size;
+        // }
+        FDHANDLE *fh = (FDHANDLE *)eax;
+        int mode = ecx;
+        switch (mode) {
+            case 0: reg[7] = fh->finfo->size; break;
+            case 1: reg[7] = fh->pos; break;
+            case 3: reg[7] = fh->pos - fh->finfo->size; break;
         }
     } else if (edx == 25) { // api_fread(char *buf, int maxsize, int fhandle)
-        fh = (struct FILEHANDLE *) eax;
-        for (i=0; i<ecx; i++) {
-            if (fh->pos == fh->size) {
-                break;
-            }
-            *((char *) ebx + ds_base + i) = fh->buf[fh->pos];
-            fh->pos++;
-        }
-        reg[7] = i;
+        // fh = (struct FILEHANDLE *) eax;
+        // for (i=0; i<ecx; i++) {
+        //     if (fh->pos == fh->size) {
+        //         break;
+        //     }
+        //     *((char *) ebx + ds_base + i) = fh->buf[fh->pos];
+        //     fh->pos++;
+        // }
+        // reg[7] = i;
+        FDHANDLE *fh = (FDHANDLE *)eax;
+        unsigned char *dst = (unsigned char *)ebx + ds_base;
+        int size = ecx;
+        int read_bytes = fd_read(fh, dst, size);
+        reg[7] = read_bytes;
     } else if (edx == 26) {
         i = 0;
         for (;;) {
@@ -901,13 +985,20 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     } else if (edx == 27) {
         reg[7] = task->langmode;
     } else if (edx == 28) { // api_fwrite(char *buf, int maxsize, int fhandle)
-        fh = (FDHANDLE *) eax;
+        FDHANDLE *fh = (FDHANDLE *) eax;
         char *buf = (char *) ebx + ds_base;
         int size = ecx;
 
+        char c[10];
+        for (i=0; i<size; i++) {
+            c[i] = buf[i];
+        }
+        c[i] = '\0';
+        cons_putstr(cons, c);
+
         reg[7] = fd_write(fh, buf, size);
     } else if (edx == 29) { // api_fopen_rw(char *fname, int mode)
-        fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));
+        FDHANDLE *fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));
 
         int mode = ecx;
 

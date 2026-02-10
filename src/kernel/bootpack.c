@@ -80,7 +80,7 @@ void HariMain(void)
 
 	init_keyboard(&fifo, 256); 											    // 키보드 초기화
 	enable_mouse(&fifo, 512, &mdec); 										// 마우스 활성화
-	io_out8(PIC0_IMR, 0xf8); 												// PIT, PIC1, 키보드 허용(11111000)
+	io_out8(PIC0_IMR, 0xb8); 												// PIT, PIC1, 키보드, FDC 허용(10111000)
 	io_out8(PIC1_IMR, 0xef); 												// 마우스 허용(11101111)
 	fifo32_init(&keycmd, 32, keycmd_buf, 0); 								// 키보드 명령 FIFO 버퍼
 
@@ -263,8 +263,8 @@ void HariMain(void)
 					fifo32_put(&keycmd, KEYCMD_LED);
 					fifo32_put(&keycmd, key_leds);
 				}
-				if (i == 256 + 0x3b && key_win != 0) {
-					fifo32_put(&key_win->task->fifo, i); // F1 눌림
+				if (i == 256 + 0x39 && key_shift != 0) {
+					fifo32_put(&key_win->task->fifo, 256 + 0xFF); // Shift + Space 가상 제어 문자 
 				}
 				if (i == 256 + 0x57) { // F11 눌림
 					sheet_updown(shtctl->sheets[1], shtctl->top - 1); // 콘솔을 제일 위로 가져옴(마우스 바로 아래)

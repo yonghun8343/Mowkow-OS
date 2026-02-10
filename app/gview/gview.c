@@ -103,7 +103,7 @@ void HariMain(void)
     for (; *p == ' '; p++) { }
 
     /* 2. 파일 읽기 */
-    i = api_fopen(p); if (i == 0) { error("file not found.\n"); }
+    i = api_fopen(p, 0); if (i == 0) { error("file not found.\n"); }
     fsize = api_fsize(i, 0);
     if (fsize > 512 * 1024) {
         error("file too large.\n");

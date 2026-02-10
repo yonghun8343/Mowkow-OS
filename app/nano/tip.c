@@ -207,7 +207,7 @@ int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
 
         key = wgetch(edit);
 
-        // 디버깅용
+      //   // 디버깅용
       //   if (key != 0) {
       //       sprintf(debug_buf, "[KEY:%3d]", key); 
       //       // bottomwin의 0행 40열(화면 오른쪽)에 출력
@@ -275,7 +275,10 @@ void titlebar(void)
    }
 
    mvwaddstr(topwin, 0, 4, "GNU nano");
-   mvwaddstr(topwin, 0, COLS/2, "New Buffer");
+   mvwaddstr(topwin, 0, COLS/2, filename);
+
+   if (modified)
+      mvwaddstr(topwin, 0, COLS - 10, "Modified");
 
    wattroff(topwin, A_REVERSE);
    wrefresh(topwin);
@@ -584,80 +587,90 @@ void load_file(void)
    wrefresh(edit);
 }
 
-// void open_file(char *filename)
-// {
-//    long size, totsize = 0, linetemp = 0;
-//    char input[2]; /* buffer */
-//    char buf[2000] = ""; 
-//    filestruct *fileptr;
+void open_file(char *filename)
+{
+   long size, totsize = 0, linetemp = 0;
+   int fh;
+   char input[2]; /* buffer */
+   char buf[2000] = ""; 
+   filestruct *fileptr;
 
-//    titlebar();
-//    fileptr = fileage;
+   titlebar();
+   fileptr = fileage;
 
-//    if (stat(filename, &fileinfo) == -1)	/* We have a new file */
-//    {
-//       statusbar("New File");
-//       fileage = malloc(sizeof(filestruct));
-//       fileage->data = malloc(2);
-//       strcpy(fileage->data, "\n");
-//       fileage->prev = NULL;
-//       fileage->next = NULL;
-//       filebot = fileage;
-//       fileptr = fileage;
-//       current = fileage;
-//    }
-//    else if ((file = open(filename, O_RDONLY)) == -1)
-//    {
-//       statusbar("%s: %s", strerror(errno), filename);
-//    }
-//    else			/* File is A-OK */
-//    {
-//       statusbar("Reading File");
+   fh = api_fopen(filename, 0);
 
-//       /* Read the entire file into file struct */
-//       while ((size = read(file, input, 1)))
-//       {
-//          linetemp = 0;
-//          if (input[0] == '\n')
-//          {
-//             if (fileage == NULL)
-//             {
-//                fileage = malloc(sizeof(filestruct));
-//                fileage->data = malloc(strlen(buf)+2);
-//                strcpy(fileage->data, buf);
-//                strcat(fileage->data, "\n");
-//                fileage->prev = NULL;
-//                fileage->next = NULL;
-//                filebot = fileage;
-//                fileptr = fileage;
-//             }
-//             else
-//             {
-//                filebot->next = malloc(sizeof(filestruct));
-//                filebot->next->data = malloc(strlen(buf)+2);
-//                strcpy(filebot->next->data, buf);
-//                strcat(filebot->next->data, "\n");
-//                filebot->next->prev = filebot;
-//                filebot->next->next = NULL;
-//                filebot = filebot->next;
-//             }
-//             totlines++;
-//             strcpy(buf, "\0");
-//          }
-//          else
-//          {
-//             strncat(buf, input, 1);
-//          }
+   if (fh == 0)	/* We have a new file */
+   {
+      statusbar("New File");
+      fileage = nano_malloc(sizeof(filestruct));
+      fileage->data = nano_malloc(2);
+      fileage->data[0] = '\n';
+      fileage->data[1] = 0;
+      fileage->prev = 0;
+      fileage->next = 0;
 
-//          totsize += size;
-//       }
-//       statusbar("Read %d bytes (%d lines)", totsize, totlines);
-//       wmove(edit, 0, 0);
+      filebot = fileage;
+      fileptr = fileage;
+      current = fileage;
+      totlines = 1;
+   }
+   else			/* File is A-OK */
+   {
+      statusbar("Reading File");
 
-//       load_file();
-//       close(file);
-//    }
-// }
+      fileage = 0;
+      filebot = 0;
+      totlines = 0;
+
+      /* Read the entire file into file struct */
+      while (api_fread(input, 1, fh) != 0)
+      {
+         if (input[0] == '\n')
+         {
+            if (fileage == 0)
+            {
+               fileage = nano_malloc(sizeof(filestruct));
+               fileage->data = nano_malloc(strlen(buf)+2);
+               strcpy(fileage->data, buf);
+               strcat(fileage->data, "\n");
+               fileage->prev = 0;
+               fileage->next = 0;
+               filebot = fileage;
+               fileptr = fileage;
+            }
+            else
+            {
+               filebot->next = nano_malloc(sizeof(filestruct));
+               filebot->next->data = nano_malloc(strlen(buf)+2);
+               strcpy(filebot->next->data, buf);
+               strcat(filebot->next->data, "\n");
+               filebot->next->prev = filebot;
+               filebot->next->next = 0;
+               filebot = filebot->next;
+            }
+            totlines++;
+            buf[0] = 0;
+         }
+         else
+         {
+            int len = my_strlen(buf);
+            if (len < 1998) {
+                buf[len] = input[0];
+                buf[len + 1] = 0;
+            }
+         }
+
+         totsize++;
+      }
+      current = fileage;
+      edittop = fileage;
+      editbot = fileage;
+
+      statusbar("Read %d bytes (%d lines)", totsize, totlines);
+      api_fclose(fh);
+   }
+}
 
 void update_cursor(void)
 {
@@ -1247,7 +1260,7 @@ void do_enter(filestruct *inptr)
    new = make_new_node(inptr);
 
    tmp = &current->data[current_x];
-   new->data = malloc(strlen(tmp) + 2);
+   new->data = nano_malloc(strlen(tmp) + 2);
    strcpy(new->data, tmp);
    *tmp++ = '\n';
    *tmp = 0;
@@ -1272,85 +1285,85 @@ void do_enter(filestruct *inptr)
 
 }
 
-// void do_wrap(filestruct *inptr)
-// {
-//    filestruct *new;
-//    char *tmp, *foo;
-//    int backup = 0, jumptonext = 0;
+void do_wrap(filestruct *inptr)
+{
+   filestruct *new;
+   char *tmp, *foo;
+   int backup = 0, jumptonext = 0;
 
-//    new = make_new_node(inptr);
+   new = make_new_node(inptr);
 
-//    tmp = inptr->data + COLS - 1;
-//    while (tmp != inptr->data && *tmp == ' ')
-//    {
-//       tmp--;
-//       backup++;
-//    }
-//    while (tmp != inptr->data && *tmp != ' ')
-//    {
-//       tmp--;
-//       backup++;
-//    }
+   tmp = inptr->data + COLS - 1;
+   while (tmp != inptr->data && *tmp == ' ')
+   {
+      tmp--;
+      backup++;
+   }
+   while (tmp != inptr->data && *tmp != ' ')
+   {
+      tmp--;
+      backup++;
+   }
 
-//    if (backup > COLS - current_x)
-//       jumptonext = 1;
+   if (backup > COLS - current_x)
+      jumptonext = 1;
 
-//    if (tmp == inptr->data)
-//       return;
-//    tmp++;
+   if (tmp == inptr->data)
+      return;
+   tmp++;
 
-//    new->data = nano_malloc(strlen(tmp) + 2);
+   new->data = nano_malloc(strlen(tmp) + 2);
 
-//    strcpy(new->data, tmp);
-//    *tmp++ = '\n';
-//    *tmp++ = 0;
-//    inptr->data = realloc(inptr->data, strlen(inptr->data) + 1);  
+   strcpy(new->data, tmp);
+   *tmp++ = '\n';
+   *tmp++ = 0;
+   inptr->data = realloc(inptr->data, strlen(inptr->data) + 1);  
 
-//    if (inptr->next != 0 && inptr->next->wrapline == 1)
-//    {
-//       foo = nano_malloc(strlen(new->data) + strlen(inptr->next->data) + 2);
-//       strcpy(foo, new->data);
-//       strip_newline(foo);
-//       strcat(foo, inptr->next->data);
-//       inptr->next->data = foo;
+   if (inptr->next != 0 && inptr->next->wrapline == 1)
+   {
+      foo = nano_malloc(strlen(new->data) + strlen(inptr->next->data) + 2);
+      strcpy(foo, new->data);
+      strip_newline(foo);
+      strcat(foo, inptr->next->data);
+      inptr->next->data = foo;
 
-//       nano_free(new);
-//    }
-//    else
-//    {
-//       fflush(stderr);
+      nano_free(new);
+   }
+   else
+   {
+      // fflush(stderr);
 
-//       new->next = inptr->next;
-//       inptr->next = new;
-//       new->next->prev = new;
-//       new->wrapline = 1;
-//    }
+      new->next = inptr->next;
+      inptr->next = new;
+      new->next->prev = new;
+      new->wrapline = 1;
+   }
 
-//    if (jumptonext == 1)
-//    {
-//       current = inptr->next;
-//       current_x = backup - (COLS - 1 - current_x);
-//    }
-//    else if (current_x == COLS - 1)
-//    {
-//       current = inptr->next;
-//       current_x = strlen(new->data)-1;
-//    }
+   if (jumptonext == 1)
+   {
+      current = inptr->next;
+      current_x = backup - (COLS - 1 - current_x);
+   }
+   else if (current_x == COLS - 1)
+   {
+      current = inptr->next;
+      current_x = strlen(new->data)-1;
+   }
    
-//    edit_refresh();
-//    reset_cursor();
-//    wrefresh(edit);
-//    totlines++;
+   edit_refresh();
+   reset_cursor();
+   wrefresh(edit);
+   totlines++;
 
-// }
+}
 
-// void check_wrap(filestruct *inptr)
-// {
-//    if ((int) strlen(inptr->data) <= COLS)
-//       return;
-//    else
-//       do_wrap(inptr);
-// }
+void check_wrap(filestruct *inptr)
+{
+   if ((int) my_strlen(inptr->data) <= COLS)
+      return;
+   else
+      do_wrap(inptr);
+}
 
 void do_gotoline(void)
 {
@@ -1426,7 +1439,7 @@ int write_file(char *name)
    filestruct *fileptr = fileage;
    int lineswritten = 0;
 
-   fh = api_fopen_rw(name, 1);
+   fh = api_fopen(name, 1); // nano p.txt << 이 파일에 대한 초기 정보가 fh에 들어가있음
    if (fh == 0) {
       statusbar("Could not open file for writing");
       return -1;
@@ -1436,8 +1449,12 @@ int write_file(char *name)
 
    while (fileptr != 0) {
       int len = my_strlen(fileptr->data);
+      // char s[50];
+      // sprintf(s, "%d", len);
+      // mvwaddstr(bottomwin, 0, 40, s); 
+      // wrefresh(bottomwin);
       if (len > 0) {
-         api_fwrite(fileptr->data, len, fh);
+         api_fwrite(fileptr->data, len, fh); // 데이터는 fileptr에 있고, 같이 넘겨주는게 fh다
       }
 
       fileptr = fileptr->next;
@@ -1524,40 +1541,25 @@ void HariMain(void)
    if (r != 0) { *r = 0; }
 
    if (q == 0) {
-        // 아직 새로운 파일 생성 기능이 구현안됐음
-        // q = "newfile.txt";
+        q = "newfile.txt";
    }
-
 
    win = api_openwin(winbuf, win_width, win_height, -1, "nano");
 	api_boxfilwin(win, 6, 27, win_width - 6, win_height - 6, 0);
 
-   current_win = win;
+   global_init();
 
+   current_win = win;
    topwin = (void *)1;
    edit   = (void *)2;
    bottomwin = (void *)3;
 
-   api_fopen_rw(q, 1);
-
-   global_init();
-
-   fileage = nano_malloc(sizeof(filestruct));
-   fileage->data = nano_malloc(1);
-   fileage->data[0] = 0;
-   fileage->next = 0;
-   fileage->prev = 0;
-
-   filebot = fileage;
-   current = fileage;
-
-   edittop = fileage;
-   editbot = fileage;
+   open_file(q);
 
    titlebar();
    bottombars(main_list, MAIN_LIST_LEN);
 
-   wmove(edit, 0, 0);
+   edit_update(current);
    api_refreshwin(win, 0, 0, win_width, win_height);
    
    hangul_init(&h_state);
@@ -1567,7 +1569,7 @@ void HariMain(void)
       int key = wgetch(edit);
 
       switch(key) {
-         case 0x3B:
+         case 0xFF:
             if (lang_mode == 1) commit_state(&h_state);
             lang_mode ^= 1;
             break;
@@ -1585,7 +1587,7 @@ void HariMain(void)
             break;
          case 8:
             if (lang_mode == 1) commit_state(&h_state);
-            // wrap_reset();
+            wrap_reset();
             do_up();
             update_cursor();
             keep_cutbuffer = 0;
@@ -1593,7 +1595,7 @@ void HariMain(void)
             break;
          case 2:
             if (lang_mode == 1) commit_state(&h_state);
-            // wrap_reset();
+            wrap_reset();
             do_down();
             update_cursor();
             keep_cutbuffer = 0;
@@ -1627,7 +1629,7 @@ void HariMain(void)
             bottombars(main_list, MAIN_LIST_LEN);
             break;
          case TIP_WHEREIS_KEY:
-            // wrap_reset();
+            wrap_reset();
             do_search();
             keep_cutbuffer = 0;
             bottombars(main_list, MAIN_LIST_LEN);
@@ -1641,25 +1643,25 @@ void HariMain(void)
             placewewant = 0;
             break;
          case TIP_INSERTFILE_KEY:
-            // wrap_reset();
+            wrap_reset();
             keep_cutbuffer = 0;
             break;
          case TIP_PREVPAGE_KEY:
-            // wrap_reset();
+            wrap_reset();
             current_x = 0;
             page_up();
             keep_cutbuffer = 0;
             check_statblank();          
             break;
          case TIP_NEXTPAGE_KEY:
-            // wrap_reset();
+            wrap_reset();
             current_x = 0;
             page_down();
             keep_cutbuffer = 0;
             check_statblank();          
             break;
          case TIP_UNCUT_KEY:
-            // wrap_reset();
+            wrap_reset();
             do_uncut_text(current);
             keep_cutbuffer = 0;
             break;
@@ -1682,6 +1684,10 @@ void HariMain(void)
             } else {
                hangul_process_key(&h_state, key);
             }
+            if (!modified) {
+               modified = 1;
+               titlebar();
+            }
             break;
          }
       reset_cursor();
@@ -1702,6 +1708,8 @@ void insert_char_at_cursor(int key) {
     }
     
     current->data[current_x] = key;
+    if (len == 0) current->data[1] = 0; // 널 문자 추가
+
     current_x++;
 }
 

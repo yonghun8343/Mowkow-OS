@@ -141,6 +141,15 @@ struct TASK *task_alloc(void)
             task->tss.gs  = 0;
             task->tss.iomap= 0x40000000;
             task->tss.ss0 = 0;
+
+            task->fhandle_count = 8;
+            int j;
+            for (j=0; j<task->fhandle_count; j++) {
+                task->fhandle[j].finfo = 0;
+                task->fhandle[j].pos = 0;
+                task->fhandle[j].cluster = 0;
+                task->fhandle[j].modified = 0;
+            }
             return task;
         }
     }

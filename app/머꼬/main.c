@@ -12,7 +12,7 @@ void init_all() {
 }
 
 void load_file(Value* env, char* path) {
-    int fh = api_fopen(path);
+    int fh = api_fopen(path, 0);
     if (fh == 0) {
         printf("[Error] 파일 '%s'을(를) 열 수 없습니다.\n", path);
         return;

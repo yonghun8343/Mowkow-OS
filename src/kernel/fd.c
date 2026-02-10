@@ -26,7 +26,14 @@ static int fdc_chk_interrupt()
 
 static unsigned int fdc_wait_interrupt() 
 {
-    while (!fdc_chk_interrupt());
+    int timeout = 1000000;
+    while (!fdc_chk_interrupt()) {
+        timeout--;
+        if (timeout == 0) {
+            sysPrints("\n[PANIC] FDC Interrupt Timeout!\n");
+            return 0; // timeout
+        }
+    }
     return 1;
 }
 
@@ -38,6 +45,7 @@ static void fdc_clear_interrupt()
 // IRQ-06 : FDC
 void inthandler26(int *esp) 
 {
+    sysPrints("IRQ6 ");
     ++fdc_interrupt;
     io_out8(PIC0_OCW2, 0x66);  // Notify IRQ-06 recv finish to PIC0
     return;
@@ -324,6 +332,8 @@ void init_fdc()
     io_out8(FDC_DOR, 0xc);
 
     fdc_specify();
+
+    io_out8(0x21, io_in8(0x21) & 0xbf);
 }
 
 static int fdc_seek(unsigned char cyl) 
@@ -579,21 +589,21 @@ void fd_close(FDHANDLE* fh)
         // fh->finfo->time = (t[2] << 11) | (t[3] << 5) | (t[4] / 2);
 
         // Write back to floppy disk.
-        // {
-        // init_dma_w();
-        // fdc_motor_on();
+        {
+        init_dma_w();
+        fdc_motor_on();
 
-        // sysPrints("FDC_WRITE\n");
-        // if (!fdc_recalibrate()) {
-        //     sysPrints("[FDC][WRITE] recalibrate error\n");
-        // } else {
-        //     if (!writeBack(fh, fatBits)) {
-        //         sysPrints("WRITE_BACK failed\n");
-        //     }
-        // }
+        sysPrints("FDC_WRITE\n");
+        if (!fdc_recalibrate()) {
+            sysPrints("[FDC][WRITE] recalibrate error\n");
+        } else {
+            if (!writeBack(fh, fatBits)) {
+                sysPrints("WRITE_BACK failed\n");
+            }
+        }
 
-        // fdc_motor_off();
-        // }
+        fdc_motor_off();
+        }
         sysPrints("[RAM-DISK] File saved in Memory.\n");
     }
     fh->finfo = 0;
@@ -702,31 +712,58 @@ static unsigned char* clusterData(int cluster)
 int fd_read(FDHANDLE* fh, void* dst, int requestSize) 
 {
     int readSize = 0;
-    unsigned char* p = dst;
+    unsigned char* p = (unsigned char *)dst;
+
     while (requestSize > 0) {
-        if (fh->pos >= (int)fh->finfo->size) {
-            break;
-        }
-        char forward = 1;
-        int nextClusterPos = (fh->pos + CLUSTER_SIZE) & -CLUSTER_SIZE;
-        if (nextClusterPos > (int)fh->finfo->size) {
-            nextClusterPos = fh->finfo->size;
-        }
-        int blockBytes = nextClusterPos - fh->pos;
-        if (blockBytes > requestSize) {
-            blockBytes = requestSize;
-            forward = 0;
-        }
-        const unsigned char* src = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
-        memcpy(p, src, blockBytes);
-        p += blockBytes;
-        fh->pos += blockBytes;
-        if (forward) {
+        if (fh->pos >= (int)fh->finfo->size) break;
+
+        int offset_in_cluster = fh->pos % CLUSTER_SIZE;
+
+        int bytes_left_in_cluster = CLUSTER_SIZE - offset_in_cluster;
+        int bytes_left_in_file = fh->finfo->size - fh->pos;
+
+        int chunk = requestSize;
+        if (chunk > bytes_left_in_cluster) chunk = bytes_left_in_cluster;
+        if (chunk > bytes_left_in_file) chunk = bytes_left_in_file;
+
+        unsigned char *src = clusterData(fh->cluster) + offset_in_cluster;
+        memcpy(p, src, chunk);
+
+        fh->pos += chunk;
+        p += chunk;
+        readSize += chunk;
+        requestSize -= chunk;
+
+        if (offset_in_cluster + chunk == CLUSTER_SIZE && fh->pos < (int)fh->finfo->size) {
             fh->cluster = get_next_cluster(fh->cluster);
+            if (fh->cluster >= 0xff0) break;
         }
-        readSize += blockBytes;
-        requestSize -= blockBytes;
     }
+
+    // while (requestSize > 0) {
+    //     if (fh->pos >= (int)fh->finfo->size) {
+    //         break;
+    //     }
+    //     char forward = 1;
+    //     int nextClusterPos = (fh->pos + CLUSTER_SIZE) & -CLUSTER_SIZE;
+    //     if (nextClusterPos > (int)fh->finfo->size) {
+    //         nextClusterPos = fh->finfo->size;
+    //     }
+    //     int blockBytes = nextClusterPos - fh->pos;
+    //     if (blockBytes > requestSize) {
+    //         blockBytes = requestSize;
+    //         forward = 0;
+    //     }
+    //     const unsigned char* src = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
+    //     memcpy(p, src, blockBytes);
+    //     p += blockBytes;
+    //     fh->pos += blockBytes;
+    //     if (forward) {
+    //         fh->cluster = get_next_cluster(fh->cluster);
+    //     }
+    //     readSize += blockBytes;
+    //     requestSize -= blockBytes;
+    // }
     return readSize;
 }
 
@@ -743,44 +780,84 @@ short allocate_cluster(void)
 }
 
 int fd_write(FDHANDLE* fh, const void* srcData, int requestSize) {
-    if (requestSize <= 0)
-        return 0;
+    if (requestSize <= 0) return 0;
 
     fh->modified = 1;
     int writeSize = 0;
     unsigned char* src = (unsigned char*)srcData;
-    while (requestSize > 0) {
-        if (fh->pos == 0) {  // First write.
-            if (fh->finfo->clustno > 0) {  // Exist old file: overwrite.
-                fh->cluster = fh->finfo->clustno;
-            } else {  // Not exist: allocate new cluster.
-                fh->cluster = fh->finfo->clustno = allocate_cluster();
-                // TODO: Error check.
-            }
-        } else if ((fh->pos % CLUSTER_SIZE) == 0) {  // Forward next cluster.
-            short nextCluster = get_next_cluster(fh->cluster);
-            if (nextCluster < 0xff0) {  // Valid: use it.
-                fh->cluster = nextCluster;
-            } else {
-                nextCluster = allocate_cluster();
-                // TODO: Error check.
-                set_next_cluster(fh->cluster, nextCluster);
-                fh->cluster = nextCluster;
-            }
-        }
 
-        int size = CLUSTER_SIZE - (fh->pos % CLUSTER_SIZE);
-        if (requestSize < size) {
-            size = requestSize;
+    if (fh->cluster == 0) {
+        if (fh->finfo->clustno > 0) {
+            fh->cluster = fh->finfo->clustno;
+        } else {
+            fh->cluster = allocate_cluster();
+            fh->finfo->clustno = fh->cluster;
         }
-        unsigned char* dst = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
-
-        memcpy(dst, src, size);
-        fh->pos += size;
-        writeSize += size;
-        dst += size;
-        requestSize -= size;
     }
+
+    while (requestSize > 0) {
+        int offset_in_cluster = fh->pos % CLUSTER_SIZE;
+        int bytes_available = CLUSTER_SIZE - offset_in_cluster;
+
+        int chunk = (requestSize < bytes_available) ? requestSize : bytes_available;
+
+        unsigned char* dst = clusterData(fh->cluster) + offset_in_cluster;
+        memcpy(dst, src, chunk);
+
+        fh->pos += chunk;
+        src += chunk;
+        writeSize += chunk;
+        requestSize -= chunk;
+
+        if (fh->pos > (int)fh->finfo->size) {
+            fh->finfo->size = fh->pos;
+        }
+
+        if (requestSize > 0) {
+            short nextCluster = get_next_cluster(fh->cluster);
+            if (nextCluster >= 0xff0) {  // No next cluster, allocate new one.
+                nextCluster = allocate_cluster();
+                set_next_cluster(fh->cluster, nextCluster);
+            }
+            fh->cluster = nextCluster;
+        }
+    }
+
+    // while (requestSize > 0) {
+    //     if (fh->pos == 0) {  // First write.
+    //         if (fh->finfo->clustno > 0) {  // Exist old file: overwrite.
+    //             fh->cluster = fh->finfo->clustno;
+    //         } else {  // Not exist: allocate new cluster.
+    //             fh->cluster = fh->finfo->clustno = allocate_cluster();
+    //             // TODO: Error check.
+    //         }
+    //     } else if ((fh->pos % CLUSTER_SIZE) == 0) {  // Forward next cluster.
+    //         short nextCluster = get_next_cluster(fh->cluster);
+    //         if (nextCluster < 0xff0) {  // Valid: use it.
+    //             fh->cluster = nextCluster;
+    //         } else {
+    //             nextCluster = allocate_cluster();
+    //             // TODO: Error check.
+    //             set_next_cluster(fh->cluster, nextCluster);
+    //             fh->cluster = nextCluster;
+    //         }
+    //     }
+
+    //     int size = CLUSTER_SIZE - (fh->pos % CLUSTER_SIZE);
+    //     if (requestSize < size) {
+    //         size = requestSize;
+    //     }
+    //     unsigned char* dst = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
+
+    //     memcpy(dst, src, size);
+    //     fh->pos += size;
+    //     writeSize += size;
+    //     dst += size;
+    //     requestSize -= size;
+    // }
+    // char c[10];
+    // sprintf(c, "Wrote %d bytes.\n", writeSize);
+    // sysPrints(c);
     return writeSize;
 }
 

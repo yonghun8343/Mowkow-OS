@@ -8,7 +8,11 @@ char *lineview(int win, int w, int y, int xskip, unsigned char *p, int tab);
 
 void HariMain(void)
 {
-	char winbuf[1024 * 757], txtbuf[240 * 1024];
+	// static char winbuf[1024 * 757];
+	// static char txtbuf[240 * 1024];
+	char *winbuf = (char *) api_malloc(1024 * 757);
+	char *txtbuf = (char *) api_malloc(240 * 1024);
+	
 	int w = 100, h = 30, t = 4, spd_x = 1, spd_y = 1;
 	int win, i, j, xskip = 0;
 	char s[30], *p, *q = 0, *r = 0;
@@ -61,7 +65,7 @@ err:
 	api_boxfilwin(win, 6, 27, w * 8 + 9, h * 16 + 30, 7);
 
 	*r = 0;
-	i = api_fopen(q);
+	i = api_fopen(q, 0);
 	if (i == 0) {
 		api_putstr("file open error.\n");
 		api_end();

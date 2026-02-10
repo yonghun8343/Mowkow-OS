@@ -13,7 +13,7 @@ void HariMain(void)
     for (p=cmdline; *p>' '; p++) { } // wait until space or end
     for (; *p==' '; p++) { }    // skip spaces
     
-    fh = api_fopen(p);
+    fh = api_fopen(p, 0);
     
     if (fh != 0) {
         for (;;) {
