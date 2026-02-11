@@ -2,6 +2,7 @@
 #define _COMPAT_H_
 
 #include "tip.h"
+#include "../include/apihan.h"
 
 #define mvwaddstr(win, y, x, str) { wmove(win, y, x); waddstr(win, str); }
 #define mvwaddch(win, y, x, ch)   { wmove(win, y, x); waddch(win, ch); }
@@ -44,5 +45,12 @@ char *my_strcpy(char *dest, const char *src);
 char *my_strncpy(char *dest, char *src, int n);
 char *my_strstr(char *haystack, char *needle);
 int my_atoi(char *str);
+
+typedef struct NANO_HAN_CTX {
+    void *win;
+    int *x_ptr;
+} NANO_HAN_CTX;
+
+void nano_han_writer(const char *str, void *aux);
 
 #endif  /* _COMPAT_H_ */

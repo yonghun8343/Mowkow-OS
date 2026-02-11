@@ -118,32 +118,101 @@ void wmove(void *win, int y, int x)
     cur_x = x;
 }
 
-void waddstr(void *win, char *str) 
-{
-    int px = cur_x * 8 + 8;
-    int py = cur_y * 16 + 28;
-    int len = my_strlen(str);
+// void waddstr(void *win, char *str) 
+// {
+//     int px = cur_x * 8 + 8;
+//     int py = cur_y * 16 + 28;
+//     int len = my_strlen(str);
 
+//     int bg_col = (reverse_mode) ? 7 : 0;  
+//     int txt_col = (reverse_mode) ? 0 : 7;
+    
+//     int rect_h = 16;
+//     int rect_w = len * 8;
+
+//     if (winbuf_global != 0) {
+//         int h, w;
+//         for (h = 0; h < rect_h; h++) {
+//             int offset = (py + h) * win_width_global + px;
+
+//             for (w = 0; w < rect_w; w++) {
+//                 winbuf_global[offset + w] = (char)bg_col;
+//             }
+//         }
+//     }
+
+//     api_putstrwin(current_win, px, py, txt_col, len, str);
+
+//     cur_x += len;
+// }
+
+void waddstr(void *win, char *str)
+{
+    if (!str) return;
+
+    int i = 0;
+    int px, py;
     int bg_col = (reverse_mode) ? 7 : 0;  
     int txt_col = (reverse_mode) ? 0 : 7;
-    
-    int rect_h = 16;
-    int rect_w = len * 8;
 
-    if (winbuf_global != 0) {
-        int h, w;
-        for (h = 0; h < rect_h; h++) {
-            int offset = (py + h) * win_width_global + px;
+    while (str[i] != 0) {
+        px = cur_x * 8 + 8;
+        py = cur_y * 16 + 28;
 
-            for (w = 0; w < rect_w; w++) {
-                winbuf_global[offset + w] = (char)bg_col;
+        unsigned char c = (unsigned char)str[i];
+        int char_len = 0;
+        int visual_width = 0;
+
+        char draw_buf[5] = {0, 0, 0, 0, 0};
+
+        if (c < 0x80) {
+            char_len = 1;
+            visual_width = 1;
+            draw_buf[0] = c;
+        } else if ((c & 0xE0) == 0xC0) {
+            char_len = 2;
+            visual_width = 1;
+        } else if ((c & 0xF0) == 0xE0) {
+            char_len = 3;
+            visual_width = 2;
+        } else if ((c & 0xF8) == 0xF0) {
+            char_len = 4;
+            visual_width = 2;
+        } else {
+            // Invalid UTF-8, skip
+            i++;
+            continue;
+        }
+
+        int k;
+        int incomplete = 0;
+        for (k=0; k<char_len; k++) {
+            if (str[i + k] == 0) {
+                incomplete = 1;
+                break;
+            }
+            draw_buf[k] = str[i + k];
+        }
+
+        if (incomplete) break;
+        
+        if (winbuf_global != 0) {
+            int rect_h = 16;
+            int rect_w = visual_width * 8;
+            int h, w;
+            for (h = 0; h < rect_h; h++) {
+                int offset = (py + h) * win_width_global + px;
+                for (w = 0; w < rect_w; w++) {
+                    winbuf_global[offset + w] = (char)bg_col;
+                }
             }
         }
+
+        api_putstrwin(current_win, px, py, txt_col, char_len, draw_buf);
+
+        cur_x += visual_width;
+        i += char_len;
     }
-
-    api_putstrwin(current_win, px, py, txt_col, len, str);
-
-    cur_x += len;
 }
 
 void waddch(void *win, int c) {
@@ -253,4 +322,23 @@ int my_atoi(char *str) {
         str++;
     }
     return res;
+}
+
+void nano_han_writer(const char *str, void *aux)
+{
+    NANO_HAN_CTX *ctx = (NANO_HAN_CTX *)aux;
+
+    if (str[0] == 0x80) {
+        if (*(ctx->x_ptr) > 0) {
+            (*(ctx->x_ptr))--;
+            mvwaddstr(ctx->win, 0, *(ctx->x_ptr), " ");
+            wmove(ctx->win, 0, *(ctx->x_ptr));
+        }
+    } else {
+        mvwaddstr(ctx->win, 0, *(ctx->x_ptr), (char *)str);
+        int width = ((unsigned char)str[0] >= 0xE0) ? 2 : 1;
+        *(ctx->x_ptr) += width;
+    }
+
+    wrefresh(ctx->win);
 }

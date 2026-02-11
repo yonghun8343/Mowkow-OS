@@ -187,71 +187,160 @@ void check_statblank(void)
    }
 }
 
+// int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
+// {
+//    int x = start_x;
+//    int i = 0;
+//    int key;
+//    char str[2];
+//    char debug_buf[20];
+
+//    mvwaddstr(bottomwin, 0, 0, buf);
+
+//    answer[0] = 0;
+//    wrefresh(bottomwin);
+
+
+//    for (;;) {
+//         wmove(bottomwin, 0, x);
+//         wrefresh(bottomwin);
+
+//         key = wgetch(edit);
+
+//       //   // 디버깅용
+//       //   if (key != 0) {
+//       //       sprintf(debug_buf, "[KEY:%3d]", key); 
+//       //       // bottomwin의 0행 40열(화면 오른쪽)에 출력
+//       //       mvwaddstr(bottomwin, 0, 40, debug_buf); 
+//       //       wrefresh(bottomwin);
+            
+//       //       // 커서를 다시 입력 위치로 원상복구
+//       //       wmove(bottomwin, 0, x);
+//       //   }
+
+//         if (key == 13) {
+//             answer[i] = 0; // 문자열 끝(NULL) 처리
+//             return 0;      // 성공 리턴
+//         }
+
+//         if (key == 127 || key == 8) {
+//             if (i > 0) {
+//                 i--;
+//                 x--;
+//                 mvwaddstr(bottomwin, 0, x, " ");
+//                 wmove(bottomwin, 0, x);
+//                 wrefresh(bottomwin);
+//             }
+//             continue;
+//         }
+
+//         if (key == 27) { // ESC
+//             return -1;
+//         }
+
+//         if (key >= 32 && key <= 126) {
+//             if (i < 130) { // 버퍼 오버플로우 방지
+//                 answer[i] = key;
+//                 i++;
+//                 str[0] = key;
+//                 str[1] = 0;
+
+//                 mvwaddstr(bottomwin, 0, x, str);
+
+//                 x++;
+//                 wrefresh(bottomwin);
+//             }
+//         }
+//     }
+// }
+
+
+
 int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
 {
    int x = start_x;
    int i = 0;
    int key;
-   char str[2];
-   char debug_buf[20];
+
+   struct HANGUL_STATE h_state;
+   NANO_HAN_CTX ctx;
+
+   ctx.win = bottomwin;
+   ctx.x_ptr = &x;
+
+   apihan_init(&h_state, nano_han_writer, &ctx);
 
    mvwaddstr(bottomwin, 0, 0, buf);
 
    answer[0] = 0;
    wrefresh(bottomwin);
 
+   int lang_mode = 0; // 0: English, 1: Hangul
 
    for (;;) {
-        wmove(bottomwin, 0, x);
-        wrefresh(bottomwin);
+      wmove(bottomwin, 0, x);
+      wrefresh(bottomwin);
 
-        key = wgetch(edit);
+      key = wgetch(edit);
 
-      //   // 디버깅용
-      //   if (key != 0) {
-      //       sprintf(debug_buf, "[KEY:%3d]", key); 
-      //       // bottomwin의 0행 40열(화면 오른쪽)에 출력
-      //       mvwaddstr(bottomwin, 0, 40, debug_buf); 
-      //       wrefresh(bottomwin);
-            
-      //       // 커서를 다시 입력 위치로 원상복구
-      //       wmove(bottomwin, 0, x);
-      //   }
+      if (key == 13) {
+         if (lang_mode == 1) {
+            apihan_run(&h_state, 0, answer, &i);
+         }
 
-        if (key == 13) {
-            answer[i] = 0; // 문자열 끝(NULL) 처리
-            return 0;      // 성공 리턴
-        }
+         answer[i] = 0; // 문자열 끝(NULL) 처리
+         return 0;      // 성공 리턴
+      }
 
-        if (key == 127 || key == 8) {
+      if (key == 127) {
+         if (lang_mode == 1) {
+            apihan_backspace(&h_state, answer, &i);
+         } else {
             if (i > 0) {
-                i--;
-                x--;
-                mvwaddstr(bottomwin, 0, x, " ");
-                wmove(bottomwin, 0, x);
-                wrefresh(bottomwin);
+               int char_len = 1;
+               int visual_len = 1;
+
+               if ((unsigned char)answer[i-1] < 0x80) {
+                  char_len = 1;
+                  visual_len = 1;
+               } else if (i >= 3) {
+                  char_len = 3;
+                  visual_len = 2;
+               }
+
+               i -= char_len;
+               x -= visual_len;
+
+               mvwaddstr(bottomwin, 0, x, (visual_len == 2) ? "  " : " ");
+               wmove(bottomwin, 0, x);
             }
-            continue;
-        }
+         }
+         continue;
+      }
+      if (key == 27) { // ESC
+         return -1;
+      }
 
-        if (key == 27) { // ESC
-            return -1;
-        }
+      if (key == 0xFF) {
+         lang_mode ^= 1;
+         apihan_run(&h_state, key, answer, &i);
+         continue;
+      }
+      if (i >= 130) continue;
 
-        if (key >= 32 && key <= 126) {
-            if (i < 130) { // 버퍼 오버플로우 방지
-                answer[i] = key;
-                i++;
-                str[0] = key;
-                str[1] = 0;
-
-                mvwaddstr(bottomwin, 0, x, str);
-
-                x++;
-                wrefresh(bottomwin);
-            }
-        }
-    }
+      if (lang_mode == 1) {
+         apihan_run(&h_state, key, answer, &i);
+      } else {
+         if (key >= 32 && key <= 126) {
+            answer[i] = key;
+            i++;
+            char temp[2];
+            temp[0] = key;
+            temp[1] = 0;
+            nano_han_writer(temp, &ctx);
+         }
+      }
+   }
 }
 
 void horizbar(void *win, int y)
@@ -274,11 +363,11 @@ void titlebar(void)
         waddch(topwin, ' ');
    }
 
-   mvwaddstr(topwin, 0, 4, "GNU nano");
+   mvwaddstr(topwin, 0, 4, "그누 나노"); // GNU nano
    mvwaddstr(topwin, 0, COLS/2, filename);
 
    if (modified)
-      mvwaddstr(topwin, 0, COLS - 10, "Modified");
+      mvwaddstr(topwin, 0, COLS - 10, "수정됨"); // Modified
 
    wattroff(topwin, A_REVERSE);
    wrefresh(topwin);
@@ -292,7 +381,7 @@ void onekey(char *keystroke, char *desc)
 
    // snprintf(description, 12, " %-11s", desc);
    description[0] = ' ';
-   for (i=0; i<10; i++) {
+   for (i=0; i<80; i++) {
       if (desc[i] == 0) break;
       description[i+1] = desc[i];
    }
@@ -476,12 +565,12 @@ int do_yesno(int all, char *msg, ...)
    wattroff(bottomwin, A_REVERSE);
 
    wmove(bottomwin, 1, 0);
-   onekey(" Y", "Yes");
+   onekey(" ㅛ", "예");          // " Y" "Yes"
    if (all)
-      onekey(" A", "All");
+      onekey(" ㅁ", "모두");       // " A" "All"
    wmove(bottomwin, 2, 0);
-   onekey(" N", "No");
-   onekey("^C", "Cancel");
+   onekey(" ㅜ", "아니오");           // " N" "No"
+   onekey("^ㅊ", "취소");       // "^C" "Cancel"
    
    va_start(ap, msg);
    // vsnprintf(foo, 132, msg, ap);
@@ -603,7 +692,7 @@ void open_file(char *filename)
 
    if (fh == 0)	/* We have a new file */
    {
-      statusbar("New File");
+      statusbar("새 파일");                       // "New File"
       fileage = nano_malloc(sizeof(filestruct));
       fileage->data = nano_malloc(2);
       fileage->data[0] = '\n';
@@ -618,7 +707,7 @@ void open_file(char *filename)
    }
    else			/* File is A-OK */
    {
-      statusbar("Reading File");
+      statusbar("파일 읽는 중");                      // "Reading File"
 
       fileage = 0;
       filebot = 0;
@@ -668,7 +757,7 @@ void open_file(char *filename)
       edittop = fileage;
       editbot = fileage;
 
-      statusbar("Read %d bytes (%d lines)", totsize, totlines);
+      statusbar("%d 바이트 (%d 줄) 읽음", totsize, totlines);         // "%d bytes (%d lines) read"
       api_fclose(fh);
    }
 }
@@ -846,9 +935,9 @@ int search_init(void)
    {
       if (case_sensitive)
          i = statusq(whereis_list, WHEREIS_LIST_LEN, "", 
-                     "Case Sensitive Search [%s]", last_search);
+                     "대소문자 구분 검색 [%s]", last_search);              // "Case Sensitive Search [%s]"
       else
-         i = statusq(whereis_list, WHEREIS_LIST_LEN, "", "Search [%s]", 
+         i = statusq(whereis_list, WHEREIS_LIST_LEN, "", "검색 [%s]",       // "Search [%s]"
                      last_search);
 
       if (i == -1) /* Aborted enter */
@@ -876,12 +965,12 @@ int search_init(void)
    {
       if (case_sensitive)
          i = statusq(whereis_list, WHEREIS_LIST_LEN, "",
-                     "Case Sensititve Search");
+                     "대소문자 구분 검색");                            // "Case Sensitive Search"
       else
-         i = statusq(whereis_list, WHEREIS_LIST_LEN, "", "Search");
+         i = statusq(whereis_list, WHEREIS_LIST_LEN, "", "검색");        // "Search"
       if (i == -1)
       {
-         statusbar("Aborted");
+         statusbar("중단됨");                                             // "Aborted"
          reset_cursor();
          return -1;
       }
@@ -956,12 +1045,12 @@ filestruct *findnextstr(int quiet, filestruct *begin, char *needle)
          reset_cursor();
 
          if (!quiet)
-            statusbar("Search Wrapped");
+            statusbar("Search Wrapped");           // ""
       }
       else	/* Nada */
       {
          if (!quiet)
-            statusbar("Search string not found");
+            statusbar("검색 문자열을 찾을 수 없습니다");           // "Search string not found"
          return 0;
       }
    }
@@ -987,9 +1076,9 @@ void do_search(void)
 void print_replaced(int num)
 {
    if (num > 1)
-      statusbar("Replaced %d occurences", num);
+      statusbar("Replaced %d occurences", num);             // "%d개 항목 교체됨"
    else if (num == 1)
-      statusbar("Replaced 1 occurence");
+      statusbar("Replaced 1 occurence");                    // "1개 항목 교체됨"
 }
 
 void do_replace (void)
@@ -1011,7 +1100,7 @@ void do_replace (void)
    if (strcmp(last_replace, ""))	/* There's a previous replace str */
    {
       i = statusq(replace_list, REPLACE_LIST_LEN, "", 
-                     "Replace with [%s]", last_replace);
+                     "[%s]로 교체", last_replace);          // "Replace with [%s]"
 
       if (i == -1) /* Aborted enter */
          strncpy(answer, last_replace, 132);
@@ -1031,10 +1120,10 @@ void do_replace (void)
    }
    else /* last_search is empty */
    {
-      i = statusq(replace_list, REPLACE_LIST_LEN, "", "Replace with");
+      i = statusq(replace_list, REPLACE_LIST_LEN, "", "다음으로 교체");        // "Replace with"
       if (i == -1)
       {
-         statusbar("Aborted");
+         statusbar("중단됨");                                    // "Aborted"
          reset_cursor();
          return;
       }
@@ -1074,7 +1163,7 @@ void do_replace (void)
    
       /* If we're here, we've found the search string */
       if (!replaceall)
-         i = do_yesno(1, "Replace this instance?");
+         i = do_yesno(1, "이 항목을 교체하시겠습니까?");         // "Replace this instance?"
 
       if (i == 1 || replaceall) /* Yes, replace it!!!! */
       {
@@ -1193,7 +1282,7 @@ void do_left(void)
       do_up();
    }
    else
-      statusbar("Beep!");
+      statusbar("삐이익!");        // "Beep!"
 
    placewewant = current_x;
 }
@@ -1371,10 +1460,10 @@ void do_gotoline(void)
    long line, i = 1, j = 0;
    filestruct *fileptr;
 
-   j = statusq(replace_list, REPLACE_LIST_LEN, "", "Enter line number");
+   j = statusq(replace_list, REPLACE_LIST_LEN, "", "줄 번호 입력");         // "Enter line number"
    if (j == -1)
    {
-      statusbar("Aborted");
+      statusbar("중단됨");      // "Aborted"
       reset_cursor();
       return;
    }
@@ -1397,14 +1486,14 @@ void do_gotoline(void)
    /* Bounds check */
    if (line <= 0)
    {
-      statusbar("Come on, be reasonable");
+      statusbar("제발, 합리적으로 생각하세요");   // "Come on, be reasonable"
       return;
    }
 
    if (line > totlines) /* FIXME - make totlines update when a new line is
 			   added / lines are uncut */
    {
-      statusbar("Only %d lines available, skipping to last line", totlines);
+      statusbar("사용 가능한 줄은 %d줄 뿐입니다, 마지막 줄로 건너뜁니다", totlines);     // "Only %d lines available, skipping to last line"
       current = filebot;
       current_x = 0;
       edit_update(current);
@@ -1442,22 +1531,17 @@ int write_file(char *name)
 
    fh = api_fopen(name, 1); // nano p.txt << 이 파일에 대한 초기 정보가 fh에 들어가있음
    if (fh == 0) {
-      statusbar("Could not open file for writing");
+      statusbar("Could not open file for writing");         // "파일을 쓰기 위해 열 수 없습니다"
       return -1;
    }
 
-   statusbar("Writing...");
+   statusbar("Writing...");         // "쓰는 중..."
 
    while (fileptr != 0) {
       int len = my_strlen(fileptr->data);
-      // char s[50];
-      // sprintf(s, "%d", len);
-      // mvwaddstr(bottomwin, 0, 40, s); 
-      // wrefresh(bottomwin);
       if (len > 0) {
          api_fwrite(fileptr->data, len, fh); // 데이터는 fileptr에 있고, 같이 넘겨주는게 fh다
       }
-      statusbar("333");
 
       fileptr = fileptr->next;
       lineswritten++;
@@ -1466,7 +1550,7 @@ int write_file(char *name)
 
    api_fclose(fh);
 
-   statusbar("Wrote %d lines", lineswritten);
+   statusbar("Wrote %d lines", lineswritten);      // "%d 줄 씀"
    return 0;
 }
 
@@ -1475,14 +1559,14 @@ void do_writeout(void)
    int i;
 
    i = statusq(writefile_list, WRITEFILE_LIST_LEN, filename, 
-                  "File Name to write");
+                  "저장할 파일 이름");         // "File Name to write" 
    if (i != -1)
    {
       if (write_file(answer) == 0) {
          strncpy(filename, answer, 132);
          modified = 0;
          titlebar();
-         statusbar("Wrote to %s", filename);
+         statusbar("%s(으)로 씀", filename);    // "Wrote to %s"
       }
    }
 
@@ -1497,7 +1581,7 @@ void do_exit(int win)
    if (!modified)
       finish(win);
 
-   i = do_yesno(0, "Save modified buffer (ANSWERING \"No\" WILL DESTROY CHANGES) ?");
+   i = do_yesno(0, "수정된 버퍼를 저장하시겠습니까? (\"아니오\"를 선택하면 변경 내용이 사라집니다)");    // "Save modified buffer (ANSWERING \"No\" WILL DESTROY CHANGES) ?"
 
    if (i == 1)
       do_writeout();
@@ -1563,7 +1647,7 @@ void HariMain(void)
    for (; (unsigned char)*p != 0; ) {
 	   p = skipspace(p);
       if (q != 0) {
-			api_putstr("> nano file\n");
+			api_putstr("> 나노 파일\n");     // "nano file\n"
 			api_end();
 		}
 		q = p;
@@ -1574,10 +1658,10 @@ void HariMain(void)
    if (r != 0) { *r = 0; }
 
    if (q == 0) {
-        q = "newfile.txt";
+        q = "파일.txt";          // "newfile.txt"
    }
 
-   win = api_openwin(winbuf, win_width, win_height, -1, "nano");
+   win = api_openwin(winbuf, win_width, win_height, -1, "나노");     // "nano"
 	api_boxfilwin(win, 6, 27, win_width - 6, win_height - 6, 0);
 
    global_init();
@@ -1596,13 +1680,10 @@ void HariMain(void)
    api_refreshwin(win, 0, 0, win_width, win_height);
    
    hangul_init(&h_state);
-   // apihan_init(&h_state, tip_writer, 0);
    lang_mode = 1; // 한글 모드로 시작
 
    for (;;) {
       int key = wgetch(edit);
-      // char dummy_buf[10]; // apihan_run이 요구하는 버퍼 (tip은 콜백 쓰므로 무시됨)
-      // int dummy_pos = 0;
 
       switch(key) {
          case 0xFF:
@@ -1616,8 +1697,6 @@ void HariMain(void)
             } else {
                do_backspace();
             }
-            // apihan_backspace(&h_state, dummy_buf, &dummy_pos);
-            // if (!modified) { modified = 1; titlebar(); }
             break;
          case 13:
             if (lang_mode == 1) commit_state(&h_state);
@@ -1725,7 +1804,6 @@ void HariMain(void)
                wrefresh_rows(current_y, current_y);
             } else {
                hangul_process_key(&h_state, key);
-               // apihan_run(&h_state, key, dummy_buf, &dummy_pos);
             }
             if (!modified) {
                modified = 1;

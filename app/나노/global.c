@@ -66,44 +66,44 @@ int statblank = 0;			/* Number of keystrokes left after
 
 shortcut main_list[MAIN_LIST_LEN] = 
 {
-{TIP_GOTO_KEY, "Goto Line"},
-{TIP_EXIT_KEY, "Exit"},
-{TIP_WRITEOUT_KEY, "Write Out"},
-{TIP_INSERTFILE_KEY, "Read File"},
-{TIP_REPLACE_KEY, "Replace"},
-{TIP_WHEREIS_KEY, "Where Is"},
-{TIP_PREVPAGE_KEY, "Prev Page"},
-{TIP_NEXTPAGE_KEY, "Next Page"},
-{TIP_CUT_KEY, "Cut Text"},
-{TIP_UNCUT_KEY, "Uncut Txt"},
-{TIP_CURSORPOS_KEY, "Cur Pos"},
-{TIP_SPELLING_KEY, "To Spell"}
+{TIP_GOTO_KEY, "줄로가기"},			// "Goto Line"
+{TIP_EXIT_KEY, "나가기"},					// "Exit"
+{TIP_WRITEOUT_KEY, "파일쓰기"},		// "Write File"
+{TIP_INSERTFILE_KEY, "파일읽기"},		// "Read File"
+{TIP_REPLACE_KEY, "대체"},			// "Replace"
+{TIP_WHEREIS_KEY, "찾기"},			// "Where Is"
+{TIP_PREVPAGE_KEY, "이전 쪽"},		// "Prev Page"
+{TIP_NEXTPAGE_KEY, "다음 쪽"},		// "Next Page"
+{TIP_CUT_KEY, "잘라내기"},				// "Cut Text"
+{TIP_UNCUT_KEY, "붙여넣기"},			// "Uncut Txt"
+{TIP_CURSORPOS_KEY, "커서위치"},			// "Cur Pos"
+{TIP_SPELLING_KEY, "맞춤법"}			// "To Spell"
 };
 
 shortcut whereis_list[WHEREIS_LIST_LEN] = 
 {
-{TIP_CASE_KEY, "Case Sens"},
-{TIP_CANCEL_KEY, "Cancel"},
-{TIP_FIRSTLINE_KEY, "First Line"},
-{TIP_LASTLINE_KEY, "Last Line"},
+{TIP_CASE_KEY, "대소구분"},			// "Case Sens"
+{TIP_CANCEL_KEY, "취소"},				// "Cancel"
+{TIP_FIRSTLINE_KEY, "첫 줄"},		// "First Line"
+{TIP_LASTLINE_KEY, "끝 줄"},		// "Last Line"
 };
 
 shortcut replace_list[REPLACE_LIST_LEN] = 
 {
-{TIP_CASE_KEY, "Case Sens"},
-{TIP_CANCEL_KEY, "Cancel"},
-{TIP_FIRSTLINE_KEY, "First Line"},
-{TIP_LASTLINE_KEY, "Last Line"},
+{TIP_CASE_KEY, "대소구분"},			// "Case Sens"
+{TIP_CANCEL_KEY, "취소"},				// "Cancel"
+{TIP_FIRSTLINE_KEY, "첫 줄"},		// "First Line"
+{TIP_LASTLINE_KEY, "끝 줄"},		// "Last Line"
 };
 
 shortcut goto_list[GOTO_LIST_LEN] = 
 {
-{TIP_FIRSTLINE_KEY, "First Line"},
-{TIP_LASTLINE_KEY, "Last Line"},
-{TIP_CANCEL_KEY, "Cancel"},
+{TIP_FIRSTLINE_KEY, "첫 줄"},		// "First Line"
+{TIP_LASTLINE_KEY, "끝 줄"},		// "Last Line"
+{TIP_CANCEL_KEY, "취소"},				// "Cancel"
 };
 
 shortcut writefile_list[WRITEFILE_LIST_LEN] = 
 {
-{TIP_CANCEL_KEY, "Cancel"},
+{TIP_CANCEL_KEY, "취소"},
 };

@@ -11,9 +11,9 @@ int getnum(char **pp, int priority);
 void HariMain(void)
 {
     int i;
-    char s[30], *p;
+    unsigned char s[100], *p;
 
-    api_cmdline(s, 30);
+    api_cmdline(s, 100);
     for (p=s; *p>' '; p++) { } // wait until space or null
     i = getnum(&p, 9);
     if (i == INVALID) {
