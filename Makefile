@@ -123,14 +123,13 @@ $(IMG_DIR)/haribote.img : $(BUILD_DIR)/boot/ipl.bin $(BUILD_DIR)/haribote.sys $(
 		$(foreach app, $(APP_TARGETS), copy from:$(app) to:@: ) \
 		copy from:$(FONT_DIR)/E2.FNT to:@: \
 		copy from:$(FONT_DIR)/H04.FNT to:@: \
-		copy from:testfiles/날개.txt to:@: \
-		copy from:testfiles/sanjini.jpg to:@: \
-		copy from:src/lib/utf8.c to:@: \
+		copy from:testfiles/test.mk to:@: \
+		copy from:app/머꼬/library.scm to:@: \
 		imgout:$@
 
 # Commands
 run: $(IMG_DIR)/haribote.img
-	$(QEMU) -fda $(IMG_DIR)/haribote.img -no-reboot -d int
+	$(QEMU) -fda $(IMG_DIR)/haribote.img -no-reboot -d int -m 512M
 
 clean:
 	$(DEL) $(BUILD_DIR) $(IMG_DIR)

@@ -71,7 +71,8 @@ struct FILEINFO *file_search(char *name, struct FILEINFO *finfo, int max)
 		if (name[x] == '.' && y <= 8) {
 			y = 8;
 		} else {
-			s[y] = name[x];
+			unsigned char c = (unsigned char)name[x];
+			s[y] = c;
 		    if ('a' <= s[y] && s[y] <= 'z') {
 		    	s[y] -= 0x20;
 			} 
@@ -84,7 +85,7 @@ struct FILEINFO *file_search(char *name, struct FILEINFO *finfo, int max)
 		}
 		if ((finfo[x].type & 0x18) == 0) {
 			for (y = 0; y < 11; y++) {
-		    	if (finfo[x].name[y] != s[y]) {
+		    	if ((unsigned char)finfo[x].name[y] != s[y]) {
 					goto next;
 				}
 			}

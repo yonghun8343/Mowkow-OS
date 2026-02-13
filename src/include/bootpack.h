@@ -9,6 +9,7 @@
 #include "graphic.h"
 #include "window.h"
 #include "file.h"
+#include "fd.h"
 
 // font data
 extern char hankaku[4096];
@@ -70,7 +71,11 @@ struct TASK {
     struct SEGMENT_DESCRIPTOR ldt[2];   // LDT
     struct CONSOLE *cons;               // 태스크와 관련된 콘솔
     int ds_base, cons_stack;            // 데이터 세그먼트 베이스 주소
-    struct FILEHANDLE *fhandle;         // 파일 핸들
+    // struct FILEHANDLE *fhandle;         // 파일 핸들
+    
+    struct FDHANDLE *fhandle;
+    int fhandle_count;
+
     int *fat;                           // 파일 할당 테이블
     char *cmdline;                      // 명령어 버퍼
     char langmode;                      // 언어 모드 (0: 영어, 1: 한국어)
@@ -114,6 +119,7 @@ struct FILEHANDLE {
 void console_task(struct SHEET *sht, int memtotal, int langmode);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move);
+void cons_putstr(struct CONSOLE *cons, char *s);
 void cons_newline(struct CONSOLE *cons);
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal);
 void cmd_mem(struct CONSOLE *cons, int memtotal);
@@ -129,11 +135,11 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 int *inthandler0c(int *esp);
 int *inthandler0d(int *esp);
 
-// 콘솔 윈도우의 높이는 16의 배수여야 함. (스크롤 함수 때문)
+// 콘솔 윈도우의 높이는 16의 배수여야 함. (스크롤 함수 때문) (512 * 308, 496 * 272)
 #define CONSOLE_WIDTH 512
-#define CONSOLE_HEIGHT 308
+#define CONSOLE_HEIGHT 320
 #define CONSOLE_TBOX_WIDTH 496
-#define CONSOLE_TBOX_HEIGHT 272
+#define CONSOLE_TBOX_HEIGHT 288
 
 // bootpack.c
 struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal, int langmode);

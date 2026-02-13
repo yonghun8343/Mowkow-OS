@@ -25,7 +25,8 @@ void init_pic(void)
     io_out8(PIC1_ICW3, 2);      // PIC1를 IRQ2에 연결
     io_out8(PIC1_ICW4, 0x01);   // non-buffer mode
 
-    io_out8(PIC0_IMR, 0xfb); // 11111011 : PIC1 제외하고 비활성화 (PIC1만 활성화)
+    // io_out8(PIC0_IMR, 0xfb); // 11111011 : PIC1 제외하고 비활성화 (PIC1만 활성화)
+    io_out8(PIC0_IMR, 0xb8); // 10111000 : IRQ 0,1,2,6 활성화
     io_out8(PIC1_IMR, 0xff); // 11111111 : 모든 인터럽트 비활성화
 
     return;
