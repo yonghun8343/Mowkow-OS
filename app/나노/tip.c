@@ -31,6 +31,12 @@
 extern char answer[132];
 extern int cur_x;
 
+char *winbuf_global;
+int win_width_global;
+
+struct HANGUL_STATE h_state;
+int lang_mode = 0;
+
 char *skipspace(char *p)
 {
    for (; *p==' '; p++) { }
@@ -1558,12 +1564,6 @@ void do_tab(void)
    }
 }
 
-char *winbuf_global;
-int win_width_global;
-
-struct HANGUL_STATE h_state;
-int lang_mode = 0;
-
 void nano_han_flush(struct HANGUL_STATE *h, char *buf, int *pos)
 {
    if (h->state != 0) {
@@ -1644,6 +1644,7 @@ void HariMain(void)
             lang_mode ^= 1;
             break;
          case 127:   // backspace
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             do_backspace();
             break;
          case 13:

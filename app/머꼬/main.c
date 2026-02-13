@@ -171,7 +171,7 @@ void HariMain(void) {
         }
         filename[i] = '\0'; // 문자열 종료
 
-        printf("파일 '%s'을(를) 로드합니다.\n", filename);
+        // printf("파일 '%s'을(를) 로드합니다.\n", filename);
         load_file(global_env, filename);
     } else {
         run_repl();
