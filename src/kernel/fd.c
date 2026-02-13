@@ -714,6 +714,15 @@ int fd_read(FDHANDLE* fh, void* dst, int requestSize)
     int readSize = 0;
     unsigned char* p = (unsigned char *)dst;
 
+    // debug---------------------------
+    // char debug[128];
+    // unsigned char* start_src = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
+    
+    // sprintf(debug, "[KERNEL READ] Clust:%d, Pos:%d, Size:%d, FirstByte:%02X, DstAddr:%08X\n", 
+    //         fh->cluster, fh->pos, fh->finfo->size, *start_src, (int)dst);
+    // sysPrints(debug);
+    // ---------------------------------
+
     while (requestSize > 0) {
         if (fh->pos >= (int)fh->finfo->size) break;
 
@@ -740,30 +749,6 @@ int fd_read(FDHANDLE* fh, void* dst, int requestSize)
         }
     }
 
-    // while (requestSize > 0) {
-    //     if (fh->pos >= (int)fh->finfo->size) {
-    //         break;
-    //     }
-    //     char forward = 1;
-    //     int nextClusterPos = (fh->pos + CLUSTER_SIZE) & -CLUSTER_SIZE;
-    //     if (nextClusterPos > (int)fh->finfo->size) {
-    //         nextClusterPos = fh->finfo->size;
-    //     }
-    //     int blockBytes = nextClusterPos - fh->pos;
-    //     if (blockBytes > requestSize) {
-    //         blockBytes = requestSize;
-    //         forward = 0;
-    //     }
-    //     const unsigned char* src = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
-    //     memcpy(p, src, blockBytes);
-    //     p += blockBytes;
-    //     fh->pos += blockBytes;
-    //     if (forward) {
-    //         fh->cluster = get_next_cluster(fh->cluster);
-    //     }
-    //     readSize += blockBytes;
-    //     requestSize -= blockBytes;
-    // }
     return readSize;
 }
 
@@ -837,42 +822,6 @@ int fd_write(FDHANDLE* fh, const void* srcData, int requestSize) {
             fh->cluster = nextCluster;
         }
     }
-
-    // while (requestSize > 0) {
-    //     if (fh->pos == 0) {  // First write.
-    //         if (fh->finfo->clustno > 0) {  // Exist old file: overwrite.
-    //             fh->cluster = fh->finfo->clustno;
-    //         } else {  // Not exist: allocate new cluster.
-    //             fh->cluster = fh->finfo->clustno = allocate_cluster();
-    //             // TODO: Error check.
-    //         }
-    //     } else if ((fh->pos % CLUSTER_SIZE) == 0) {  // Forward next cluster.
-    //         short nextCluster = get_next_cluster(fh->cluster);
-    //         if (nextCluster < 0xff0) {  // Valid: use it.
-    //             fh->cluster = nextCluster;
-    //         } else {
-    //             nextCluster = allocate_cluster();
-    //             // TODO: Error check.
-    //             set_next_cluster(fh->cluster, nextCluster);
-    //             fh->cluster = nextCluster;
-    //         }
-    //     }
-
-    //     int size = CLUSTER_SIZE - (fh->pos % CLUSTER_SIZE);
-    //     if (requestSize < size) {
-    //         size = requestSize;
-    //     }
-    //     unsigned char* dst = clusterData(fh->cluster) + (fh->pos % CLUSTER_SIZE);
-
-    //     memcpy(dst, src, size);
-    //     fh->pos += size;
-    //     writeSize += size;
-    //     dst += size;
-    //     requestSize -= size;
-    // }
-    // char c[10];
-    // sprintf(c, "Wrote %d bytes.\n", writeSize);
-    // sysPrints(c);
     return writeSize;
 }
 

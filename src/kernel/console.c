@@ -755,7 +755,6 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
     // reg[0] : edi, reg[1] : esi, reg[2] : ebp, reg[3] : esp
     // reg[4] : ebx, reg[5] : edx, reg[6] : ecx, reg[7] : eax
     int i;
-    struct FILEINFO *finfo;
     // struct FILEHANDLE *fh;
     // FDHANDLE *fd;
     struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
