@@ -119,7 +119,7 @@ static int compose_utf8(char *dest, int cho, int jung, int jong) {
 
 static void clear_view(struct HANGUL_STATE *h) {
     int i;
-    char bs[2] = {0x08, 0};
+    char bs[2] = {0x7F, 0};
     /* view_width만큼 백스페이스 출력 */
     for(i=0; i<h->view_width; i++) {
         output_str(h, bs);
