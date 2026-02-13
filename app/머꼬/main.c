@@ -73,7 +73,7 @@ void load_file(Value* env, char* path) {
         // EOF 확인 (토큰이 없으면 종료)
         // parse.c 로직상 depth가 0일 때 버퍼 끝에 도달하면 "" 토큰을 반환하고 종료함
         if (get_current_token()[0] == '\0') {
-            printf("디버그: EOF. 루프 탈출\n");
+            // printf("디버그: EOF. 루프 탈출\n");
             break;
         }
 

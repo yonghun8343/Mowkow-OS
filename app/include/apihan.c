@@ -119,7 +119,7 @@ static int compose_utf8(char *dest, int cho, int jung, int jong) {
 
 static void clear_view(struct HANGUL_STATE *h) {
     int i;
-    char bs[2] = {0x08, 0};
+    char bs[2] = {0x7F, 0};
     /* view_width만큼 백스페이스 출력 */
     for(i=0; i<h->view_width; i++) {
         output_str(h, bs);
@@ -169,7 +169,7 @@ static void flush_state(struct HANGUL_STATE *h, char *buf, int *pos) {
 }
 
 static void erase_visual(struct HANGUL_STATE *h, int count) {
-    char eraser[] = {0x08, ' ', 0x08, 0}; 
+    char eraser[] = {0x7F, ' ', 0x7F, 0}; 
     int i;
     for (i = 0; i < count; i++) {
         output_str(h, eraser);
