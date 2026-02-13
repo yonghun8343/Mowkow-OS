@@ -169,7 +169,7 @@ static void flush_state(struct HANGUL_STATE *h, char *buf, int *pos) {
 }
 
 static void erase_visual(struct HANGUL_STATE *h, int count) {
-    char eraser[] = {0x08, ' ', 0x08, 0}; 
+    char eraser[] = {0x7F, ' ', 0x7F, 0}; 
     int i;
     for (i = 0; i < count; i++) {
         output_str(h, eraser);

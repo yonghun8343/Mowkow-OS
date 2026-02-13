@@ -269,7 +269,7 @@ void nano_han_writer(const char *str, void *aux)
 {
     HAN_CONTEXT *ctx = (HAN_CONTEXT *)aux;
 
-    if (str[0] == 0x08) {
+    if (str[0] == 0x7F) {
         if (ctx->target == TARGET_EDITOR) {
             unsigned char last = (unsigned char)current->data[current_x - 1];
             if ((last & 0xC0) == 0x80) { 
