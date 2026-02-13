@@ -1,9 +1,6 @@
 #include "apilib.h"
 #include "apihan.h"
 
-/* ============================================================
-   [Tables] 커널 hangul.c의 테이블과 로직 이식
-   ============================================================ */
 static int jong2cho[] = {
     -1, 0, 1, -1, 2, -1, -1, 3, 5, -1, -1, -1, -1, -1, -1, -1, 
     6, 7, -1, 9, 10, 11, 12, 14, 15, 16, 17, 18
@@ -31,9 +28,36 @@ static char KeyToJongIdx[128] = {
     ['T']=20, ['d']=21, ['w']=22, ['c']=23, ['z']=24, ['x']=25, ['v']=26, ['g']=27
 };
 
-/* ============================================================
-   [Helpers] 합성/분해 로직 (커널과 동일)
-   ============================================================ */
+static char *CHO_UTF8[] = {
+    "\xE3\x84\xB1", // 0: ㄱ
+    "\xE3\x84\xB2", // 1: ㄲ
+    "\xE3\x84\xB4", // 2: ㄴ
+    "\xE3\x84\xB7", // 3: ㄷ
+    "\xE3\x84\xB8", // 4: ㄸ
+    "\xE3\x84\xB9", // 5: ㄹ
+    "\xE3\x85\x81", // 6: ㅁ
+    "\xE3\x85\x82", // 7: ㅂ
+    "\xE3\x85\x83", // 8: ㅃ
+    "\xE3\x85\x85", // 9: ㅅ
+    "\xE3\x85\x86", // 10: ㅆ
+    "\xE3\x85\x87", // 11: ㅇ
+    "\xE3\x85\x88", // 12: ㅈ
+    "\xE3\x85\x89", // 13: ㅉ
+    "\xE3\x85\x8A", // 14: ㅊ
+    "\xE3\x85\x8B", // 15: ㅋ
+    "\xE3\x85\x8C", // 16: ㅌ
+    "\xE3\x85\x8D", // 17: ㅍ
+    "\xE3\x85\x8E"  // 18: ㅎ
+};
+
+static char *JUNG_UTF8[] = {
+    "\xE3\x85\x8F", "\xE3\x85\x90", "\xE3\x85\x91", "\xE3\x85\x92", "\xE3\x85\x93", // ㅏ ㅐ ㅑ ㅒ ㅓ
+    "\xE3\x85\x94", "\xE3\x85\x95", "\xE3\x85\x96", "\xE3\x85\x97", "\xE3\x85\x98", // ㅔ ㅕ ㅖ ㅗ ㅘ
+    "\xE3\x85\x99", "\xE3\x85\x9A", "\xE3\x85\x9B", "\xE3\x85\x9C", "\xE3\x85\x9D", // ㅙ ㅚ ㅛ ㅜ ㅝ
+    "\xE3\x85\x9E", "\xE3\x85\x9F", "\xE3\x85\xA0", "\xE3\x85\xA1", "\xE3\x85\xA2", // ㅞ ㅟ ㅠ ㅡ ㅢ
+    "\xE3\x85\xA3"                                                                  // ㅣ
+};
+
 static int get_composite_jung(int j1, int j2) {
     if (j1==8) { if(j2==0) return 9; if(j2==1) return 10; if(j2==20) return 11; }
     if (j1==13) { if(j2==4) return 14; if(j2==5) return 15; if(j2==20) return 16; }
@@ -69,9 +93,6 @@ static int get_second_jong(int c) {
     return -1;
 }
 
-/* ============================================================
-   [Display & Buffer] 화면 출력 및 버퍼 관리
-   ============================================================ */
 void apihan_init(struct HANGUL_STATE *h, apihan_output_fn func, void *aux) {
     h->state = 0;
     h->cho = h->jung = h->jong = -1;
@@ -84,7 +105,6 @@ static void output_str(struct HANGUL_STATE *h, const char *str) {
     if (h->output_func) h->output_func(str, h->aux_data);
 }
 
-/* UTF-8 변환 (3바이트) */
 static int compose_utf8(char *dest, int cho, int jung, int jong) {
     if (cho < 0 || cho > 18 || jung < 0 || jung > 20) return 0;
     int real_jong = (jong < 0) ? 0 : jong;
@@ -97,7 +117,6 @@ static int compose_utf8(char *dest, int cho, int jung, int jong) {
     return 3;
 }
 
-/* 화면의 조합 중인 글자 지우기 */
 static void clear_view(struct HANGUL_STATE *h) {
     int i;
     char bs[2] = {0x08, 0};
@@ -108,7 +127,6 @@ static void clear_view(struct HANGUL_STATE *h) {
     h->view_width = 0;
 }
 
-/* 현재 상태를 화면에 그리기 (버퍼 반영 X) */
 static void draw_view(struct HANGUL_STATE *h) {
     char buf[4] = {0};
     if (h->state == 0) return;
@@ -119,7 +137,9 @@ static void draw_view(struct HANGUL_STATE *h) {
         compose_utf8(buf, h->cho, h->jung, h->jong);
         output_str(h, buf);
         h->view_width = 2; // 한글은 백스페이스 2번(16px) 필요
-    } else { 
+    } else if (h->cho != -1) {
+        output_str(h, CHO_UTF8[h->cho]);
+        h->view_width = 2; // 한글 초성도 백스페이스  
     }
 }
 
@@ -134,13 +154,12 @@ static void flush_state(struct HANGUL_STATE *h, char *buf, int *pos) {
         int len = compose_utf8(utf8, h->cho, h->jung, h->jong);
         int i;
         for(i=0; i<len; i++) buf[(*pos)++] = utf8[i];
-        // api_putstr(utf8); // 확정된 글자 출력
         output_str(h, utf8);
-    } else {
-        // 초성만 있다가 flush 되면? (예: 'ㄱ' 치고 엔터)
-        // 해당 자음을 버퍼에 넣어야 함. 
-        // 자모 매핑 테이블이 없으므로 여기서는 무시됨(증발).
-        // 완벽한 구현을 위해선 호환 자모 변환이 필요.
+    } else if (h->cho != -1) {
+        char *single_cho = CHO_UTF8[h->cho];
+        int i;
+        for(i=0; i<3; i++) buf[(*pos)++] = single_cho[i];
+        output_str(h, single_cho);
     }
     
     // 상태 리셋
@@ -153,21 +172,16 @@ static void erase_visual(struct HANGUL_STATE *h, int count) {
     char eraser[] = {0x08, ' ', 0x08, 0}; 
     int i;
     for (i = 0; i < count; i++) {
-        // api_putstr(eraser);
         output_str(h, eraser);
     }
 }
 
-/* ============================================================
-   [Core Logic] 오토마타 실행
-   ============================================================ */
 void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
     if (key == 0) return;
 
     /* 1. 특수키 처리 */
     if (key >= 128) { // Function keys etc.
         flush_state(h, buf, pos);
-        // 여기서 버퍼에 넣을지 말지 결정 필요. 보통 무시.
         return;
     }
 
@@ -194,14 +208,22 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
             if (c != -1) { h->state=1; h->cho=c; }
             else if (u != -1) { 
                 // 모음 단독: flush 후 출력
-                flush_state(h, buf, pos); // 빈 상태 flush (의미 없음)
-                // 모음 단독은 완성형으로 만들 수 없으므로 그냥 둠(증발) 혹은 호환자모 처리 필요
+                // flush_state(h, buf, pos);
+                char *single_jung = JUNG_UTF8[u];
+                int i;
+                for(i=0; i<3; i++) buf[(*pos)++] = single_jung[i];
+                output_str(h, single_jung);
             }
             break;
         case 1: // 초성
             if (u != -1) { h->state=2; h->jung=u; } // ㄱ+ㅏ=가
             else if (c != -1) { 
-                h->state=1; h->cho=c; 
+                char *prev_cho = CHO_UTF8[h->cho];
+                int i;
+                for(i=0; i<3; i++) buf[(*pos)++] = prev_cho[i];
+                output_str(h, prev_cho);
+
+                h->state=1; h->cho=c;
             }
             break;
         case 2: // 중성
@@ -214,7 +236,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                     int len = compose_utf8(utf8, h->cho, h->jung, h->jong);
                     int i;
                     for(i=0; i<len; i++) buf[(*pos)++] = utf8[i];
-                    // api_putstr(utf8); // 화면에 확정 출력
                     output_str(h, utf8);
 
                     h->state=0; h->cho=-1; h->jung=-1; h->jong=-1; h->view_width=0;
@@ -224,7 +245,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                 char utf8[4];
                 compose_utf8(utf8, h->cho, h->jung, h->jong);
                 int i; for(i=0; i<3; i++) buf[(*pos)++] = utf8[i];
-                // api_putstr(utf8);
                 output_str(h, utf8);
                 
                 h->state=1; h->cho=c; h->jung=-1; h->jong=-1; h->view_width=0;
@@ -241,7 +261,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                 char utf8[4];
                 compose_utf8(utf8, prev_cho, prev_jung, 0); // 종성 뺌
                 int i; for(i=0; i<3; i++) buf[(*pos)++] = utf8[i];
-                // api_putstr(utf8);
                 output_str(h, utf8);
 
                 // 뒷 글자(가) 시작
@@ -254,7 +273,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                     char utf8[4];
                     compose_utf8(utf8, h->cho, h->jung, h->jong);
                     int i; for(i=0; i<3; i++) buf[(*pos)++] = utf8[i];
-                    // api_putstr(utf8);
                     output_str(h, utf8);
                     
                     h->state=1; h->cho=c; h->jung=-1; h->jong=-1; h->view_width=0;
@@ -265,13 +283,12 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
             if (u != -1) { // 닭+ㅏ -> 달, 가
                 int complex = h->jong;
                 int j1 = get_first_jong(complex);
-                int j2 = get_second_jong(complex); // 초성이 될 녀석
+                int j2 = get_second_jong(complex);
 
                 // 앞 글자(달) 확정
                 char utf8[4];
                 compose_utf8(utf8, h->cho, h->jung, j1);
                 int i; for(i=0; i<3; i++) buf[(*pos)++] = utf8[i];
-                // api_putstr(utf8);
                 output_str(h, utf8);
                 
                 // 뒷 글자(가) 시작
@@ -281,7 +298,6 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
                 char utf8[4];
                 compose_utf8(utf8, h->cho, h->jung, h->jong);
                 int i; for(i=0; i<3; i++) buf[(*pos)++] = utf8[i];
-                // api_putstr(utf8);
                 output_str(h, utf8);
                 
                 h->state=1; h->cho=c; h->jung=-1; h->jong=-1; h->view_width=0;
@@ -293,11 +309,13 @@ void apihan_run(struct HANGUL_STATE *h, int key, char *buf, int *pos) {
     if (h->state > 0 && h->jung != -1) {
         char utf8[4];
         compose_utf8(utf8, h->cho, h->jung, h->jong);
-        // api_putstr(utf8);
         output_str(h, utf8);
         h->view_width = 2;
     } else if (h->state == 1) {
-        // 초성만 있는 경우 시각적 피드백 없음 (임시)
+        // 초성만 있는 경우
+        output_str(h, CHO_UTF8[h->cho]);
+        h->view_width = 2;
+    } else {
         h->view_width = 0;
     }
 }
@@ -327,7 +345,6 @@ void apihan_backspace(struct HANGUL_STATE *h, char *buf, int *pos) {
         if (h->state > 0 && h->jung != -1) {
             char utf8[4];
             compose_utf8(utf8, h->cho, h->jung, h->jong);
-            // api_putstr(utf8);
             output_str(h, utf8);
             h->view_width = 2;
         } else {

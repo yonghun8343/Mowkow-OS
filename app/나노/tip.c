@@ -24,12 +24,12 @@
 #include "tip.h"
 #include "compat.h"
 #include "proto.h"
-#include "han.h"
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 
 extern char answer[132];
+extern int cur_x;
 
 char *skipspace(char *p)
 {
@@ -39,10 +39,10 @@ char *skipspace(char *p)
 
 void finish(int win)
 {
-    blank_bottombars();
-    wrefresh(bottomwin);
-    endwin(win);
-    api_end();
+   blank_bottombars();
+   wrefresh(bottomwin);
+   endwin(win);
+   api_end();
 }
 
 void global_init(void)
@@ -73,15 +73,18 @@ filestruct *copy_node(filestruct *src)
 /* Unlink a node from the rest of the struct */
 void unlink_node(filestruct *fileptr)
 {
-   if (fileptr->prev != 0)
+   if (fileptr->prev != 0) {
       fileptr->prev->next = fileptr->next;
-   if (fileptr->next != 0)
+   }
+
+   if (fileptr->next != 0) {
       fileptr->next->prev = fileptr->prev;
+   }
 }
 
 void delete_node(filestruct *fileptr)
 {
-   nano_free(fileptr->data);
+   if (fileptr->data != 0) nano_free(fileptr->data);
    nano_free(fileptr);
 }
 
@@ -94,8 +97,7 @@ filestruct *copy_filestruct(filestruct *src)
    tmp = src->next;
    prev = head;
 
-   while (tmp != 0)
-   {
+   while (tmp != 0) {
       dst = copy_node(tmp);
       dst->prev = prev;
       prev->next = dst;
@@ -110,11 +112,10 @@ filestruct *copy_filestruct(filestruct *src)
 
 int free_node (filestruct *src)
 {
-   if (src == 0)
-      return 0;
+   if (src == 0) return 0;
 
-   if (src->next != 0)
-      nano_free(src->data);
+   if (src->next != 0) nano_free(src->data);
+
    nano_free(src);
    return 1;
 }
@@ -123,14 +124,13 @@ int free_filestruct(filestruct *src)
 {
    filestruct *fileptr = src;
 
-   if (src == 0)
-      return 0;
+   if (src == 0) return 0;
 
-   while (fileptr->next != 0)
-   {
+   while (fileptr->next != 0) {
       fileptr = fileptr->next;
       free_node(fileptr->prev);
    }
+
    free_node(fileptr);
 
    return 1;
@@ -153,9 +153,11 @@ void blank_bottombars(void)
 {
    int i, j;
 
-   for (j = 1; j <= 2; j++)
-      for (i = 0; i <= COLS - 1; i++)
+   for (j = 1; j <= 2; j++) {
+      for (i = 0; i <= COLS - 1; i++) {
          mvwaddch(bottomwin, j, i, ' ');
+      }
+   }
 
   reset_cursor();
 }
@@ -164,8 +166,9 @@ void blank_statusbar(void)
 {
    int i;
 
-   for (i = 0; i <= COLS - 1; i++)
+   for (i = 0; i <= COLS - 1; i++) {
       mvwaddch(bottomwin, 0, i, ' ');
+   }
 
   reset_cursor();
 }
@@ -178,83 +181,12 @@ void blank_statusbar_refresh(void)
 
 void check_statblank(void)
 {
-   if (statblank > 1)
-      statblank--;
-   else if (statblank == 1)
-   {
+   if (statblank > 1) statblank--;
+   else if (statblank == 1) {
       statblank--;
       blank_statusbar_refresh();
    }
 }
-
-// int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
-// {
-//    int x = start_x;
-//    int i = 0;
-//    int key;
-//    char str[2];
-//    char debug_buf[20];
-
-//    mvwaddstr(bottomwin, 0, 0, buf);
-
-//    answer[0] = 0;
-//    wrefresh(bottomwin);
-
-
-//    for (;;) {
-//         wmove(bottomwin, 0, x);
-//         wrefresh(bottomwin);
-
-//         key = wgetch(edit);
-
-//       //   // 디버깅용
-//       //   if (key != 0) {
-//       //       sprintf(debug_buf, "[KEY:%3d]", key); 
-//       //       // bottomwin의 0행 40열(화면 오른쪽)에 출력
-//       //       mvwaddstr(bottomwin, 0, 40, debug_buf); 
-//       //       wrefresh(bottomwin);
-            
-//       //       // 커서를 다시 입력 위치로 원상복구
-//       //       wmove(bottomwin, 0, x);
-//       //   }
-
-//         if (key == 13) {
-//             answer[i] = 0; // 문자열 끝(NULL) 처리
-//             return 0;      // 성공 리턴
-//         }
-
-//         if (key == 127 || key == 8) {
-//             if (i > 0) {
-//                 i--;
-//                 x--;
-//                 mvwaddstr(bottomwin, 0, x, " ");
-//                 wmove(bottomwin, 0, x);
-//                 wrefresh(bottomwin);
-//             }
-//             continue;
-//         }
-
-//         if (key == 27) { // ESC
-//             return -1;
-//         }
-
-//         if (key >= 32 && key <= 126) {
-//             if (i < 130) { // 버퍼 오버플로우 방지
-//                 answer[i] = key;
-//                 i++;
-//                 str[0] = key;
-//                 str[1] = 0;
-
-//                 mvwaddstr(bottomwin, 0, x, str);
-
-//                 x++;
-//                 wrefresh(bottomwin);
-//             }
-//         }
-//     }
-// }
-
-
 
 int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
 {
@@ -263,8 +195,9 @@ int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
    int key;
 
    struct HANGUL_STATE h_state;
-   NANO_HAN_CTX ctx;
+   HAN_CONTEXT ctx;
 
+   ctx.target = TARGET_STATUSBAR;
    ctx.win = bottomwin;
    ctx.x_ptr = &x;
 
@@ -275,7 +208,7 @@ int tipgetstr(char *buf, char *def, shortcut s[], int slen, int start_x)
    answer[0] = 0;
    wrefresh(bottomwin);
 
-   int lang_mode = 0; // 0: English, 1: Hangul
+   int lang_mode = 1; // 0: English, 1: Hangul
 
    for (;;) {
       wmove(bottomwin, 0, x);
@@ -348,8 +281,9 @@ void horizbar(void *win, int y)
    int i = 0;
 
    wattron(win, A_REVERSE);
-   for (i = 0; i <= COLS - 1; i++)
+   for (i = 0; i <= COLS - 1; i++) {
       mvwaddch(win, y, i, ' ');
+   }
    wattroff(win, A_REVERSE);
 }
 
@@ -360,14 +294,13 @@ void titlebar(void)
    int i;
    wmove(topwin, 0, 0);
    for (i=0; i<COLS; i++) {
-        waddch(topwin, ' ');
+      waddch(topwin, ' ');
    }
 
    mvwaddstr(topwin, 0, 4, "그누 나노"); // GNU nano
    mvwaddstr(topwin, 0, COLS/2, filename);
 
-   if (modified)
-      mvwaddstr(topwin, 0, COLS - 10, "수정됨"); // Modified
+   if (modified) mvwaddstr(topwin, 0, COLS - 10, "수정됨"); // Modified
 
    wattroff(topwin, A_REVERSE);
    wrefresh(topwin);
@@ -379,7 +312,6 @@ void onekey(char *keystroke, char *desc)
    char description[80];
    int i;
 
-   // snprintf(description, 12, " %-11s", desc);
    description[0] = ' ';
    for (i=0; i<80; i++) {
       if (desc[i] == 0) break;
@@ -398,8 +330,7 @@ void clear_bottomwin(void)
 {
    int i;
 
-   for (i = 0; i <= COLS - 1; i++)
-   {
+   for (i = 0; i <= COLS - 1; i++) {
       mvwaddch(bottomwin, 1, i, ' ');
       mvwaddch(bottomwin, 2, i, ' ');
    }
@@ -413,8 +344,7 @@ void bottombars(shortcut s[], int slen)
 
    clear_bottomwin();
    wmove(bottomwin, 1, 0);
-   for (i = 0; i <= slen - 1; i += 2)
-   {
+   for (i = 0; i <= slen - 1; i += 2) {
       keystr[0] = '^';
       keystr[1] = s[i].val + 64;
       keystr[2] = 0;
@@ -422,8 +352,7 @@ void bottombars(shortcut s[], int slen)
       onekey(keystr, s[i].desc);
    }
    wmove(bottomwin, 2, 0);
-   for (i = 1; i <= slen - 1; i += 2)
-   {
+   for (i = 1; i <= slen - 1; i += 2) {
       keystr[0] = '^';
       keystr[1] = s[i].val + 64;
       keystr[2] = 0;
@@ -439,13 +368,9 @@ void update_line(filestruct *fileptr)
    filestruct *filetmp;
    int line = 0;
 
-  for (filetmp = edittop; filetmp != fileptr && filetmp != editbot; 
-       filetmp = filetmp->next)
-     line++;
+  for (filetmp = edittop; filetmp != fileptr && filetmp != editbot; filetmp = filetmp->next) line++;
 
   mvwaddstr(edit, line, 0, filetmp->data);
-//   wrefresh(edit);
-
 }
 
 void center_cursor(void)
@@ -464,11 +389,9 @@ void edit_refresh(void)
     
    while (lines <= editwinrows - 1 && temp != 0) {
       mvwaddstr(edit, lines, 0, temp->data);
-      
-      // 줄 내용이 짧으면 나머지 공간을 공백으로 지움
-      int len = my_strlen(temp->data);
-      for (j = len; j < COLS; j++) {
-          mvwaddch(edit, lines, j, ' ');
+   
+      for (j = cur_x; j < COLS; j++) {
+         mvwaddch(edit, lines, j, ' ');
       }
       
       temp = temp->next;
@@ -476,8 +399,9 @@ void edit_refresh(void)
    } 
 
    for (; lines <= editwinrows - 1; lines++) {
-      for(j = 0; j < COLS; j++)
+      for(j = 0; j < COLS; j++) {
          mvwaddch(edit, lines, j, ' ');
+      }
    }
    
    editbot = temp;
@@ -504,10 +428,11 @@ void edit_update(filestruct *fileptr)
    if (temp == filebot) {
       mvwaddstr(edit, lines, 0, filebot->data);
       lines++;
-      for (i = lines; i <= editwinrows - 1; i++)
-         for(j = 0; j <= COLS - 1; j++)
+      for (i = lines; i <= editwinrows - 1; i++) {
+         for(j = 0; j <= COLS - 1; j++) {
             mvwaddch(edit, i, j, ' ');
-
+         }
+      }
    }
    editbot = temp;
 
@@ -546,6 +471,15 @@ int statusq(shortcut s[], int slen, char *def, char *msg, ...)
    ret = tipgetstr(foo, def, s, slen, (strlen(foo)));
    wattroff(bottomwin, A_REVERSE);
 
+   switch (ret) {
+      case TIP_FIRSTLINE_KEY:
+         do_first_line();
+         break;
+      case TIP_LASTLINE_KEY:
+         do_last_line();
+         break;
+   }
+
    /* Then blank the screen */
    blank_statusbar_refresh();
 
@@ -565,15 +499,13 @@ int do_yesno(int all, char *msg, ...)
    wattroff(bottomwin, A_REVERSE);
 
    wmove(bottomwin, 1, 0);
-   onekey(" ㅛ", "예");          // " Y" "Yes"
-   if (all)
-      onekey(" ㅁ", "모두");       // " A" "All"
+   onekey(" Y", "예");          // " Y" "Yes"
+   if (all) onekey(" A", "모두");       // " A" "All"
    wmove(bottomwin, 2, 0);
-   onekey(" ㅜ", "아니오");           // " N" "No"
-   onekey("^ㅊ", "취소");       // "^C" "Cancel"
+   onekey(" N", "아니오");           // " N" "No"
+   onekey("^C", "취소");       // "^C" "Cancel"
    
    va_start(ap, msg);
-   // vsnprintf(foo, 132, msg, ap);
    mini_vsnprintf(foo, 132, msg, ap);
    va_end(ap);
    wattron(bottomwin, A_REVERSE);
@@ -583,12 +515,10 @@ int do_yesno(int all, char *msg, ...)
 
    reset_cursor();
 
-   while (ok == -1)
-   {
+   while (ok == -1) {
       kbinput = wgetch(edit);
 
-      switch (kbinput)
-      {
+      switch (kbinput) {
          case 'Y': case 'y':
             ok = 1;
             break;
@@ -620,12 +550,10 @@ void statusbar(char *msg, ...)
    int start_x = 0;
 
    va_start(ap, msg);
-   // vsnprintf(foo, 132, msg, ap);
+   mini_vsnprintf(foo, 132, msg, ap);
    va_end(ap);
 
    start_x = center_x - strlen(foo) / 2 - 1;
-
-   /* Blank out line */
    blank_statusbar_refresh();
 
    wmove(bottomwin, 0, start_x);
@@ -647,9 +575,10 @@ void total_refresh(int win)
    redrawin(win);
    bottombars(main_list, MAIN_LIST_LEN);
    titlebar();
-   for (i = 0 ; i <= LINES - 1; i++);
+   for (i = 0 ; i <= LINES - 1; i++) {
       for (j = i; j != COLS; j++)
          mvwaddch(edit, i, j, ' ');
+   }
    wrefresh(edit);
 
    edit_refresh();
@@ -746,8 +675,8 @@ void open_file(char *filename)
          {
             int len = my_strlen(buf);
             if (len < 1998) {
-                buf[len] = input[0];
-                buf[len + 1] = 0;
+               buf[len] = input[0];
+               buf[len + 1] = 0;
             }
          }
 
@@ -813,22 +742,22 @@ void add_to_cutbuffer(filestruct *inptr)
    filestruct *tmp;
 
    tmp = cutbuffer;
-   if (cutbuffer == NULL)
+   if (cutbuffer == 0)
    {
       cutbuffer = inptr;
-      inptr->next = NULL;
-      inptr->prev = NULL;
+      inptr->next = 0;
+      inptr->prev = 0;
       return;
    }
    else
    {
-      while(tmp->next != NULL)
+      while(tmp->next != 0)
          tmp = tmp->next;
    }
 
    tmp->next = inptr;
    inptr->prev = tmp;
-   inptr->next = NULL;
+   inptr->next = 0;
    cutbottom = inptr;
 }
 
@@ -880,7 +809,6 @@ void do_cut_text(filestruct *fileptr)
    edit_refresh();
    wrefresh(edit);
 
-   // dump_buffer(cutbuffer);
    reset_cursor();
 
    keep_cutbuffer = 1;
@@ -916,8 +844,6 @@ void do_uncut_text(filestruct *fileptr)
    reset_cursor();
    wrefresh(edit);
 
-   // dump_buffer(cutbuffer);
-   // dump_buffer(fileage);
 }
 
 void do_early_abort(void)
@@ -1000,8 +926,7 @@ filestruct *findnextstr(int quiet, filestruct *begin, char *needle)
 
    searchstr = &current->data[current_x+1]; 
    /* Look for searchstr until EOF */
-   while (fileptr != 0 && 
-         (found = strstrwrapper(searchstr, needle)) == 0)
+   while (fileptr != 0 && (found = strstrwrapper(searchstr, needle)) == 0)
    {
        fileptr = fileptr->next;
 
@@ -1027,8 +952,7 @@ filestruct *findnextstr(int quiet, filestruct *begin, char *needle)
    {
       fileptr = fileage;
 
-      while(fileptr != current && fileptr != begin && 
-            (found = strstrwrapper(fileptr->data,  needle)) == 0)
+      while(fileptr != current && fileptr != begin && (found = strstrwrapper(fileptr->data,  needle)) == 0)
          fileptr = fileptr->next;
 
       if (fileptr == begin)
@@ -1076,9 +1000,9 @@ void do_search(void)
 void print_replaced(int num)
 {
    if (num > 1)
-      statusbar("Replaced %d occurences", num);             // "%d개 항목 교체됨"
+      statusbar("%d개 항목 교체됨", num);             // "Replaced %d occurences"
    else if (num == 1)
-      statusbar("Replaced 1 occurence");                    // "1개 항목 교체됨"
+      statusbar("1개 항목 교체됨");                    // "Replaced 1 occurence"
 }
 
 void do_replace (void)
@@ -1099,8 +1023,7 @@ void do_replace (void)
 
    if (strcmp(last_replace, ""))	/* There's a previous replace str */
    {
-      i = statusq(replace_list, REPLACE_LIST_LEN, "", 
-                     "[%s]로 교체", last_replace);          // "Replace with [%s]"
+      i = statusq(replace_list, REPLACE_LIST_LEN, "", "[%s]로 교체", last_replace);          // "Replace with [%s]"
 
       if (i == -1) /* Aborted enter */
          strncpy(answer, last_replace, 132);
@@ -1169,8 +1092,7 @@ void do_replace (void)
       {
 
          /* FIXME - lots of ugly code */
-         copy = nano_malloc(strlen(current->data) - strlen(last_search) + 
-                       strlen(last_replace) + 1);
+         copy = nano_malloc(strlen(current->data) - strlen(last_search) + strlen(last_replace) + 1);
 
          strncpy(copy, current->data, current_x);
          copy[current_x] = 0;
@@ -1289,7 +1211,7 @@ void do_left(void)
 
 void delete_buffer(filestruct *inptr)
 {
-   if (inptr != NULL)
+   if (inptr != 0)
    {
       delete_buffer(inptr->next);
       nano_free(inptr->data);
@@ -1301,18 +1223,24 @@ void do_backspace(void)
 {
    filestruct *previous;
 
-   if (current_x != 0)
-   {
+   if (current_x != 0) {
+      int delete_len = 1;
+      unsigned char *chk_ptr = (unsigned char *)current->data;
+
+      while ((current_x - delete_len) > 0) {
+         if ((chk_ptr[current_x - delete_len] & 0xC0) == 0x80) {
+            delete_len++;
+         } else {
+            break; // 헤더(11xxxxxx)나 ASCII(0xxxxxxx)를 만나면 중단
+         }
+      }
+
       /* Let's get dangerous */
-      memmove(&current->data[current_x - 1], &current->data[current_x], 
-              strlen(current->data) - current_x + 2);
+      memmove(&current->data[current_x - delete_len], &current->data[current_x], strlen(current->data) - current_x + 2);
       current->data = realloc(current->data, strlen(current->data) + 1);
-      current_x--;
-   }
-   else
-   {
-      if (current == fileage)
-         return;	/* Can't delete past top of file */
+      current_x -= delete_len;
+   } else {
+      if (current == fileage) return;	/* Can't delete past top of file */
 
       previous = current->prev;
       current_x = strlen(previous->data) - 1;
@@ -1323,15 +1251,15 @@ void do_backspace(void)
 
       unlink_node(current);
       delete_node(current);
-      if (current == edittop)
-         page_up();
+
+      if (current == edittop) page_up();
+      
       current = previous;
       previous_line();
       wrefresh(edit);
-
    }
-   if (!modified)
-   {
+
+   if (!modified) {
       modified = 1;
       titlebar();
    }
@@ -1383,24 +1311,32 @@ void do_wrap(filestruct *inptr)
 
    new = make_new_node(inptr);
 
-   tmp = inptr->data + COLS - 1;
-   while (tmp != inptr->data && *tmp == ' ')
-   {
-      tmp--;
-      backup++;
-   }
-   while (tmp != inptr->data && *tmp != ' ')
-   {
-      tmp--;
-      backup++;
+   int i = 0;
+   int visual = 0;
+   char *data = inptr->data;
+   while (data[i] != 0) {
+      unsigned char c = (unsigned char)data[i];
+      int char_len = (c >= 0xE0) ? 3 : 1; // UTF-8 문자 길이 계산
+      int char_width = (c >= 0xE0) ? 2 : 1; // 문자 너비 계산
+
+      if (visual + char_width > COLS) break;
+
+      visual += char_width;
+      i += char_len;
    }
 
-   if (backup > COLS - current_x)
-      jumptonext = 1;
+   tmp = inptr->data + i;
 
-   if (tmp == inptr->data)
-      return;
-   tmp++;
+   while (tmp < inptr->data) {
+      if (*tmp == ' ') break;
+      tmp--;
+      while (tmp > inptr->data && (*(unsigned char *)tmp & 0xC0) == 0x80) {
+         tmp--;
+      }
+   }
+
+   if (tmp == inptr->data) tmp = inptr->data + i;
+   else tmp++;
 
    new->data = nano_malloc(strlen(tmp) + 2);
 
@@ -1421,8 +1357,6 @@ void do_wrap(filestruct *inptr)
    }
    else
    {
-      // fflush(stderr);
-
       new->next = inptr->next;
       inptr->next = new;
       new->next->prev = new;
@@ -1445,11 +1379,28 @@ void do_wrap(filestruct *inptr)
    wrefresh(edit);
    totlines++;
 
+   return;
+}
+
+int get_visual_width(char *str) {
+    int width = 0;
+    int i = 0;
+    while (str[i] != 0) {
+        unsigned char c = (unsigned char)str[i];
+        if (c >= 0xE0) { 
+            width += 2;  
+            i += 3;
+        } else {         
+            width += 1;  
+            i += 1;
+        }
+    }
+    return width;
 }
 
 void check_wrap(filestruct *inptr)
 {
-   if ((int) my_strlen(inptr->data) <= COLS)
+   if (get_visual_width(inptr->data) <= COLS)
       return;
    else
       do_wrap(inptr);
@@ -1531,11 +1482,11 @@ int write_file(char *name)
 
    fh = api_fopen(name, 1); // nano p.txt << 이 파일에 대한 초기 정보가 fh에 들어가있음
    if (fh == 0) {
-      statusbar("Could not open file for writing");         // "파일을 쓰기 위해 열 수 없습니다"
+      statusbar("파일을 쓰기 위해 열 수 없습니다");         // "Could not open file for writing"
       return -1;
    }
 
-   statusbar("Writing...");         // "쓰는 중..."
+   statusbar("쓰는 중...");         // "Writing..."
 
    while (fileptr != 0) {
       int len = my_strlen(fileptr->data);
@@ -1550,7 +1501,7 @@ int write_file(char *name)
 
    api_fclose(fh);
 
-   statusbar("Wrote %d lines", lineswritten);      // "%d 줄 씀"
+   statusbar("%d 줄 씀", lineswritten);      // "%d lines written"
    return 0;
 }
 
@@ -1607,40 +1558,32 @@ void do_tab(void)
    }
 }
 
-void tip_writer(const char *str, void *aux)
-{
-   if (str[0] == 0x08) {
-      delete_char_at_cursor();
-   } else {
-      int i;
-      for (i=0; str[i] != 0; i++) {
-         insert_char_at_cursor(str[i]);
-      }
-   }
-
-   update_line(current);
-   wrefresh(edit);
-}
-
 char *winbuf_global;
 int win_width_global;
 
-HANGUL_STATE h_state;
+struct HANGUL_STATE h_state;
 int lang_mode = 0;
+
+void nano_han_flush(struct HANGUL_STATE *h, char *buf, int *pos)
+{
+   if (h->state != 0) {
+      apihan_run(h, 0xFFFF, buf, pos);
+      *pos = 0;
+   }
+   return;
+}
 
 void HariMain(void)
 {
    char s[30], *p, *q = 0, *r = 0; // p: 커맨드라인 포인터, q: 파일이름 시작 포인터, r: 파일이름 끝 포인터
    int win_width = COLS * 8 + 48;
    int win_height = LINES * 16 + 36;
+   int win;
 
    api_initmalloc();
    char *winbuf = (char *)nano_malloc(win_width * win_height);
-
    winbuf_global = winbuf;
    win_width_global = win_width;
-
-   int win;
 
    api_cmdline(s, 30);
    for (p = s; (unsigned char)*p > ' '; p++) { }
@@ -1678,36 +1621,41 @@ void HariMain(void)
 
    edit_update(current);
    api_refreshwin(win, 0, 0, win_width, win_height);
+
+   HAN_CONTEXT editor_ctx;
+   editor_ctx.target = TARGET_EDITOR;
+   editor_ctx.win = edit;
+   editor_ctx.x_ptr = 0;
    
-   hangul_init(&h_state);
+   apihan_init(&h_state, nano_han_writer, &editor_ctx);
    lang_mode = 1; // 한글 모드로 시작
 
+   // apihan 사용을 위한 버퍼 (나노에서는 안 씀)
+   char dummy_buf[32];
+   int dummy_pos = 0;
+
    for (;;) {
+      dummy_pos = 0;
       int key = wgetch(edit);
 
       switch(key) {
          case 0xFF:
-            if (lang_mode == 1) apihan_init(&h_state, tip_writer, 0);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             lang_mode ^= 1;
             break;
          case 127:   // backspace
-            if (lang_mode == 1 && h_state.state > 0) {
-               commit_state(&h_state);
-               do_backspace();
-            } else {
-               do_backspace();
-            }
+            do_backspace();
             break;
          case 13:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             do_enter(current);
             break;
          case 0xFE:     // tab
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             do_tab();
             break;
          case 8:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             wrap_reset();
             do_up();
             update_cursor();
@@ -1715,7 +1663,7 @@ void HariMain(void)
             check_statblank();          
             break;
          case 2:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             wrap_reset();
             do_down();
             update_cursor();
@@ -1723,14 +1671,14 @@ void HariMain(void)
             check_statblank();          
             break;
          case 4:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             do_left();
             update_cursor();
             keep_cutbuffer = 0;
             check_statblank();          
             break;
          case 6:
-            if (lang_mode == 1) commit_state(&h_state);
+            if (lang_mode == 1) nano_han_flush(&h_state, dummy_buf, &dummy_pos);
             do_right();
             update_cursor();
             keep_cutbuffer = 0;
@@ -1800,10 +1748,11 @@ void HariMain(void)
          default:
             if (lang_mode == 0) {
                insert_char_at_cursor(key);
+               check_wrap(current);
                update_line(current);
                wrefresh_rows(current_y, current_y);
             } else {
-               hangul_process_key(&h_state, key);
+               apihan_run(&h_state, key, dummy_buf, &dummy_pos);
             }
             if (!modified) {
                modified = 1;
@@ -1817,35 +1766,3 @@ void HariMain(void)
    api_end();
 }
 
-/* 현재 커서 위치에 1바이트 삽입 (UTF-8 시퀀스 구성용) */
-void insert_char_at_cursor(int key) {
-    int len = (current->data == 0) ? 0 : my_strlen(current->data);
-    current->data = realloc(current->data, len + 2);
-    
-    int i;
-    // 데이터 밀기
-    for(i = len; i >= current_x; i--) {
-        current->data[i+1] = current->data[i];
-    }
-    
-    current->data[current_x] = key;
-    if (len == 0) current->data[1] = 0; // 널 문자 추가
-
-    current_x++;
-}
-
-/* 현재 커서 앞의 1바이트 삭제 (백스페이스) */
-void delete_char_at_cursor() {
-    if (current_x <= 0) return;
-    
-    int len = my_strlen(current->data);
-    
-    // 데이터 당기기
-    int i;
-    for(i = current_x - 1; i < len; i++) {
-        current->data[i] = current->data[i+1];
-    }
-    
-    current->data = realloc(current->data, len); // 크기 줄임
-    current_x--;
-}

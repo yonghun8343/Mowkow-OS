@@ -126,6 +126,7 @@ $(IMG_DIR)/haribote.img : $(BUILD_DIR)/boot/ipl.bin $(BUILD_DIR)/haribote.sys $(
 		copy from:testfiles/날개.txt to:@: \
 		copy from:testfiles/sanjini.jpg to:@: \
 		copy from:app/머꼬/library.scm to:@: \
+		copy from:testfiles/test.txt to:@: \
 		imgout:$@
 
 # Commands

@@ -117,6 +117,66 @@ void put_johab(unsigned char *vram, int xsize, int x, int y, char color, unsigne
     return;
 }
 
+static const char U2J_CompatChoMap[30] = {
+    0,  1, -1,  2, -1, -1,  3,  4,  5, -1,  // 3131(ㄱ) ~ 313A
+   -1, -1, -1, -1, -1, -1,  6,  7,  8, -1,  // 313B ~ 3144(ㅃ)
+    9, 10, 11, 12, 13, 14, 15, 16, 17, 18   // 3145(ㅅ) ~ 314E(ㅎ)
+};
+
+/**
+ * @brief 한글 자모 버퍼 출력 함수
+ * 
+ * @param vram: 비디오 메모리 주소
+ * @param xsize: 화면 가로 크기
+ * @param x: 출력할 x 좌표
+ * @param y: 출력할 y 좌표
+ * @param color: 출력할 색상
+ * @param font: 한글 자모 폰트 주소
+ * @param unicode: 유니코드 값 (UTF-8 -> Unicode)
+ * 
+ * @return void
+ */
+void put_jamo(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *font, unsigned int unicode)
+{
+    int font_idx = -1;
+    unsigned char *p_font = 0;
+    // 1. 자음 처리 (ㄱ ~ ㅎ) : 0x3131 ~ 0x314E
+    if (unicode >= 0x3131 && unicode <= 0x314E) {
+        // 0x3131('ㄱ')을 1로 기준 잡았을 때의 오프셋
+        int offset = unicode - 0x3130;
+
+        int mapped_idx = U2J_CompatChoMap[offset];
+        
+        if (mapped_idx != -1) {
+            font_idx = mapped_idx;
+            p_font = font + (0 * 20 + font_idx) * 32;
+        }
+    }
+    // 2. 모음 처리 (ㅏ ~ ㅣ) : 0x314F ~ 0x3163
+    else if (unicode >= 0x314F && unicode <= 0x3163) {
+        // 모음 매핑
+        font_idx = unicode - 0x314F;
+        if (font_idx != -1) {
+            p_font = font + (160 + 0 * 22 + font_idx) * 32;
+        }
+    }
+
+    // 폰트를 찾았으면 그리기
+    if (p_font != 0) {
+        int i, b;
+        for (i=0; i<16; i++) {
+            unsigned char line1 = p_font[i*2];
+            unsigned char line2 = p_font[i*2+1];
+            unsigned char *p = vram + (y + i) * xsize + x;
+            
+            for (b=0; b<8; b++) {
+                if (line1 & (0x80 >> b)) p[b] = color;
+                if (line2 & (0x80 >> b)) p[b+8] = color;
+            }
+        }
+    }
+}
+
 /**
  * @brief 유니코드->초성조합코드 매핑 테이블
  * 
@@ -175,6 +235,23 @@ static char KeyToJongIdx[128] = {
     ['a'] = 16, ['q'] = 17, ['t'] = 19, ['T'] = 20, ['d'] = 21,     // ㅁ, ㅂ, ㅅ, ㅆ, ㅇ
     ['w'] = 22, ['c'] = 23, ['z'] = 24, ['x'] = 25, ['v'] = 26,     // ㅈ, ㅊ, ㅋ, ㅌ, ㅍ
     ['g'] = 27                                                      // ㅎ
+};
+
+// 초성 인덱스(0~18) -> UTF-8 자모 (ㄱ~ㅎ)
+static unsigned char *CHO_UTF8[] = {
+    "\xE3\x84\xB1", "\xE3\x84\xB2", "\xE3\x84\xB4", "\xE3\x84\xB7", "\xE3\x84\xB8", // ㄱ ㄲ ㄴ ㄷ ㄸ
+    "\xE3\x84\xB9", "\xE3\x85\x81", "\xE3\x85\x82", "\xE3\x85\x83", "\xE3\x85\x85", // ㄹ ㅁ ㅂ ㅃ ㅅ
+    "\xE3\x85\x86", "\xE3\x85\x87", "\xE3\x85\x88", "\xE3\x85\x89", "\xE3\x85\x8A", // ㅆ ㅇ ㅈ ㅉ ㅊ
+    "\xE3\x85\x8B", "\xE3\x85\x8C", "\xE3\x85\x8D", "\xE3\x85\x8E"                  // ㅋ ㅌ ㅍ ㅎ
+};
+
+// 중성 인덱스(0~20) -> UTF-8 자모 (ㅏ~ㅣ)
+static unsigned char *JUNG_UTF8[] = {
+    "\xE3\x85\x8F", "\xE3\x85\x90", "\xE3\x85\x91", "\xE3\x85\x92", "\xE3\x85\x93", // ㅏ ㅐ ㅑ ㅒ ㅓ
+    "\xE3\x85\x94", "\xE3\x85\x95", "\xE3\x85\x96", "\xE3\x85\x97", "\xE3\x85\x98", // ㅔ ㅕ ㅖ ㅗ ㅘ
+    "\xE3\x85\x99", "\xE3\x85\x9A", "\xE3\x85\x9B", "\xE3\x85\x9C", "\xE3\x85\x9D", // ㅙ ㅚ ㅛ ㅜ ㅝ
+    "\xE3\x85\x9E", "\xE3\x85\x9F", "\xE3\x85\xA0", "\xE3\x85\xA1", "\xE3\x85\xA2", // ㅞ ㅟ ㅠ ㅡ ㅢ
+    "\xE3\x85\xA3"                                                                  // ㅣ
 };
 
 /** 
@@ -263,6 +340,30 @@ unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul)
     int jung_idx = hangul.jung;
     int jong_idx = hangul.jong;
 
+    if (cho_idx != -1 && jung_idx == -1) {
+        if (cho_idx >= 0 && cho_idx <= 18) { // 초성만 있음
+            unsigned char *utf8 = CHO_UTF8[cho_idx];
+            dest[0] = utf8[0]; 
+            dest[1] = utf8[1]; 
+            dest[2] = utf8[2]; 
+            dest[3] = 0;
+            return 3;
+        }
+        return 0;
+    }
+
+    if (cho_idx == -1 && jung_idx != -1) {
+        if (jung_idx >= 0 && jung_idx <= 20) {
+            unsigned char *utf8 = JUNG_UTF8[jung_idx];
+            dest[0] = utf8[0]; 
+            dest[1] = utf8[1]; 
+            dest[2] = utf8[2]; 
+            dest[3] = 0;
+            return 3;
+        }
+        return 0;
+    }
+
     // 유효한 인덱스인지 확인
     if (cho_idx < 0 || cho_idx > 18 || jung_idx < 0 || jung_idx > 20) {
         return 0; // 한글 아님
@@ -280,6 +381,40 @@ unsigned char johab_to_utf8(unsigned char *dest, struct HANGUL hangul)
     dest[3] = 0; // 널 종료
 
     return 3; // 변환 성공
+}
+
+/**
+ * @brief 한글 문자 출력 함수 (유니코드 입력).
+ * 
+ * 유니코드 범위에 따라 조합형 코드로 변환하여 출력하거나, 자모 범위일 경우 자모만 출력
+ * 
+ * @param vram: 출력할 VRAM 버퍼
+ * @param xsize: VRAM 버퍼의 가로 크기
+ * @param x: 출력할 x 좌표
+ * @param y: 출력할 y 좌표
+ * @param color: 출력할 색상
+ * @param font: 한글 폰트 주소
+ * @param unicode: 출력할 문자 유니코드 (UTF-8로부터 변환된 값)
+ * 
+ * @return: void
+ */
+void put_hangul_char(unsigned char *vram, int xsize, int x, int y, char color, unsigned char *font, unsigned int unicode)
+{
+    if (unicode >= 0xAC00 && unicode <= 0xD7A3) {
+        unsigned int temp = unicode - 0xAC00;
+        int cho = temp / 588;
+        int jung = (temp % 588) / 28;
+        int jong = temp % 28;
+
+        unsigned short johab = 0x8000; // 최상위 비트 1 설정
+        johab |= (U2J_cho[cho] & 0x1F) << 10; // 초성
+        johab |= (U2J_jung[jung] & 0x1F) << 5; // 중성
+        johab |= (U2J_jong[jong] & 0x1F); // 종성
+
+        put_johab(vram, xsize, x, y, color, font, johab);
+    } else if (unicode >= 0x3130 && unicode <= 0x318F) {
+        put_jamo(vram, xsize, x, y, color, font, unicode);
+    }
 }
 
 /**
@@ -302,14 +437,7 @@ void putstr_utf8(unsigned char *vram, int xsize, int x, int y, char color, unsig
     unsigned char *korean = (unsigned char *) *((int *) 0x0fe8); // 한글 폰트 주소
     char s_temp[2] = {0, 0}; // 문자 하나만 담는 임시 버퍼
     unsigned short johab;
-
-    int cho, jung, jong;
-    unsigned char *p_cho, *p_jung, *p_jong;
-    int jong_exist;
-
-    int i, b;
-    unsigned char line1, line2;
-    unsigned char *p;
+    unsigned int unicode;
 
     while (*s != 0x00) {
         if ((*s & 0x80) == 0) {
@@ -320,13 +448,12 @@ void putstr_utf8(unsigned char *vram, int xsize, int x, int y, char color, unsig
             s++;
         } else {
             // 3바이트 UTF-8 문자
-            // UTF-8 -> 조합형 코드 변환
             if (s[1] == 0x00 || s[2] == 0x00) break; // 잘못된 문자열 처리
-
-            johab = utf8_to_johab(s);
-            if (johab != 0 && korean != 0) {
-                put_johab(vram, xsize, x, y, color, korean, johab);
+            unicode = ((s[0] & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+            if ((unicode >= 0xAC00 && unicode <= 0xD7A3) || (unicode >= 0x3130 && unicode <= 0x318F)) {
+                put_hangul_char(vram, xsize, x, y, color, korean, unicode);
             }
+
             x += 16;
             s += 3; // 3바이트 문자이므로 포인터 3 증가
         }

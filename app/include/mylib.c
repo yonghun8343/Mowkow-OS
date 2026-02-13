@@ -6,7 +6,7 @@
 
 
 static struct HANGUL_STATE h_state;
-static int lang_mode = 0; // 0:Eng, 1:Kor
+static int lang_mode = 1; // 0:Eng, 1:Kor
 
 void console_writer(const char *str, void *aux) {
     api_putstr((char *)str);

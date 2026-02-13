@@ -46,10 +46,16 @@ char *my_strncpy(char *dest, char *src, int n);
 char *my_strstr(char *haystack, char *needle);
 int my_atoi(char *str);
 
-typedef struct NANO_HAN_CTX {
+typedef enum {
+    TARGET_EDITOR,
+    TARGET_STATUSBAR
+} INPUT_TARGET;
+
+typedef struct HAN_CONTEXT {
+    INPUT_TARGET target;
     void *win;
     int *x_ptr;
-} NANO_HAN_CTX;
+} HAN_CONTEXT;
 
 void nano_han_writer(const char *str, void *aux);
 

@@ -20,6 +20,10 @@ extern int cur_y;
 extern char *winbuf_global;
 extern int win_width_global;
 
+extern struct filestruct *current;
+
+extern void check_wrap(struct filestruct *inptr);
+
 int ctrl_pressed = 0;
 
 int wgetch(void *win)
@@ -117,34 +121,6 @@ void wmove(void *win, int y, int x)
     cur_y = base_y + y;
     cur_x = x;
 }
-
-// void waddstr(void *win, char *str) 
-// {
-//     int px = cur_x * 8 + 8;
-//     int py = cur_y * 16 + 28;
-//     int len = my_strlen(str);
-
-//     int bg_col = (reverse_mode) ? 7 : 0;  
-//     int txt_col = (reverse_mode) ? 0 : 7;
-    
-//     int rect_h = 16;
-//     int rect_w = len * 8;
-
-//     if (winbuf_global != 0) {
-//         int h, w;
-//         for (h = 0; h < rect_h; h++) {
-//             int offset = (py + h) * win_width_global + px;
-
-//             for (w = 0; w < rect_w; w++) {
-//                 winbuf_global[offset + w] = (char)bg_col;
-//             }
-//         }
-//     }
-
-//     api_putstrwin(current_win, px, py, txt_col, len, str);
-
-//     cur_x += len;
-// }
 
 void waddstr(void *win, char *str)
 {
@@ -324,21 +300,80 @@ int my_atoi(char *str) {
     return res;
 }
 
+/* 현재 커서 위치에 1바이트 삽입 (UTF-8 시퀀스 구성용) */
+void insert_char_at_cursor(int key) {
+    int len = (current->data == 0) ? 0 : my_strlen(current->data);
+    current->data = realloc(current->data, len + 2);
+    
+    int i;
+    // 데이터 밀기
+    for(i = len; i >= current_x; i--) {
+        current->data[i+1] = current->data[i];
+    }
+    
+    current->data[current_x] = key;
+    if (len == 0) current->data[1] = 0; // 널 문자 추가
+
+    current_x++;
+    return;
+}
+
+/* 현재 커서 앞의 1바이트 삭제 (백스페이스) */
+void delete_char_at_cursor() {
+    if (current_x <= 0) return;
+    
+    int len = my_strlen(current->data);
+    
+    // 데이터 당기기
+    int i;
+    for(i = current_x - 1; i < len; i++) {
+        current->data[i] = current->data[i+1];
+    }
+    
+    current->data = realloc(current->data, len); // 크기 줄임
+    current_x--;
+}
+
 void nano_han_writer(const char *str, void *aux)
 {
-    NANO_HAN_CTX *ctx = (NANO_HAN_CTX *)aux;
+    HAN_CONTEXT *ctx = (HAN_CONTEXT *)aux;
 
-    if (str[0] == 0x80) {
-        if (*(ctx->x_ptr) > 0) {
-            (*(ctx->x_ptr))--;
-            mvwaddstr(ctx->win, 0, *(ctx->x_ptr), " ");
-            wmove(ctx->win, 0, *(ctx->x_ptr));
+    if (str[0] == 0x08) {
+        if (ctx->target == TARGET_EDITOR) {
+            unsigned char last = (unsigned char)current->data[current_x - 1];
+            if ((last & 0xC0) == 0x80) { 
+                delete_char_at_cursor(); 
+                delete_char_at_cursor(); 
+            } else {
+                delete_char_at_cursor(); 
+            }
+        } else {
+            if (ctx->x_ptr && *(ctx->x_ptr) > 0) {
+                (*(ctx->x_ptr))--;
+                mvwaddstr(ctx->win, 0, *(ctx->x_ptr), " ");
+                wmove(ctx->win, 0, *(ctx->x_ptr));
+            }
         }
     } else {
-        mvwaddstr(ctx->win, 0, *(ctx->x_ptr), (char *)str);
-        int width = ((unsigned char)str[0] >= 0xE0) ? 2 : 1;
-        *(ctx->x_ptr) += width;
+        if (ctx->target == TARGET_EDITOR) {
+            int i;
+            for (i=0; str[i]!=0; i++) {
+                insert_char_at_cursor((unsigned char)str[i]);
+            }
+            check_wrap(current);
+        } else {
+            if (ctx->x_ptr) {
+                mvwaddstr(ctx->win, 0, *(ctx->x_ptr), (char *)str);
+                int width = ((unsigned char)str[0] >= 0xE0) ? 2 : 1;
+                *(ctx->x_ptr) += width;
+            }
+        }
     }
 
-    wrefresh(ctx->win);
+    if (ctx->target == TARGET_EDITOR) {
+        update_line(current);
+        wrefresh(edit);
+    } else {
+        wrefresh(ctx->win);
+    }
 }
