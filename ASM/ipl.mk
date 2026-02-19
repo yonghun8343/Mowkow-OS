@@ -2,19 +2,7 @@
 ; TAB=4
 
 (불러오기 "레지스터.mk")
-(불러오기 "common.mk")
-
-; (정의 머리글자 0육7ㄷ) ; MBR		EQU		0x7c0
-; (정의 바이트_섹터 512) ; BYTES_PER_SECTOR	EQU		512
-; (정의 섹터_클러스터 1) ; SECTORS_PER_CLUSTER	EQU		1
-; (정의 예약된_섹터 1) ; RESERVED_SECTORS	EQU		1
-; (정의 FAT_개수 2) ; NUM_FATS	EQU		2
-; (정의 루트_디렉토리_엔트리 224) ; ROOT_DIR_ENTRIES	EQU		224
-; (정의 총_섹터_16 2880) ; TOTAL_SECTORS_16	EQU		2880
-; (정의 미디어_종류 0xF0) ; MEDIA_TYPE	EQU		0xF0
-; (정의 섹터당_FAT_16 9) ; SECTORS_PER_FAT_16	EQU		9
-; (정의 섹터당_트랙 18) ; SECTORS_PER_TRACK	EQU		18
-; (정의 헤드_수 2) ; NUMBER_OF_HEADS	EQU		2
+(불러오기 "공통.mk")
 
 (정의 실린더 9) ; CYLS	EQU		9
 (정의 시작점 0육7ㄷ00) ; ORG		0x7c00
