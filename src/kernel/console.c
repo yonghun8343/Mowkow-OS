@@ -321,11 +321,11 @@ void cons_newline(struct CONSOLE *cons)
  */
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 {
-    if ((strcmp(cmdline, "mem") == 0 || strcmp(cmdline, "메모리") == 0) && cons->sht != 0) {        // 가능
+    if ((strcmp(cmdline, "mem") == 0 || strcmp(cmdline, "메모리") == 0) && cons->sht != 0) {
         cmd_mem(cons, memtotal);
-    } else if ((strcmp(cmdline, "cls") == 0 || strcmp(cmdline, "clear") == 0 || strcmp(cmdline, "지우기") == 0) && cons->sht != 0) {    // 가능
+    } else if ((strcmp(cmdline, "cls") == 0 || strcmp(cmdline, "clear") == 0 || strcmp(cmdline, "지우기") == 0) && cons->sht != 0) {
         cmd_cls(cons);
-    } else if ((strcmp(cmdline, "dir") == 0 || strcmp(cmdline, "ls") == 0 || strcmp(cmdline, "목록") == 0) && cons->sht != 0) {   // 가능
+    } else if ((strcmp(cmdline, "dir") == 0 || strcmp(cmdline, "ls") == 0 || strcmp(cmdline, "목록") == 0) && cons->sht != 0) {
         cmd_dir(cons);
     } else if ((strcmp(cmdline, "exit") == 0 || strcmp(cmdline, "종료") == 0)) {
         cmd_exit(cons, fat);
@@ -574,18 +574,18 @@ void cmd_touch(struct CONSOLE *cons, char *cmdline)
     filename[j] = 0; // null-terminate
 
     if (filename[0] == 0) {
-        cons_putstr(cons, "Usage: touch [filename]\n");
+        cons_putstr(cons, "사용법: touch [filename]\n");
         return;
     }
 
     if (fd_writeopen(&fh, filename) == 0) {
-        cons_putstr(cons, "File open error.\n");
+        cons_putstr(cons, "파일 열기 오류.\n");
         return;
     }
 
     fh.modified = 1;
     fd_close(&fh);
-    cons_putstr(cons, "File created successfully.\n");
+    cons_putstr(cons, "파일 생성됨.\n");
     return;
 }
 
@@ -654,7 +654,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
     } else {
         // 압축된 앱 압축 해제 후 파일 처리
         if (file_size < 17) {
-            cons_putstr(cons, "Invalid .hrb file format.\n");
+            cons_putstr(cons, "맞지 않는 hrb 파일 형식.\n");
             memman_free_4k(memman, (int) file_buf, file_size);
             return 0;
         }
@@ -666,13 +666,13 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
             memman_free_4k(memman, (int) file_buf, file_size);
 
             if (strncmp(exec_buf + 4, "Hari", 4) != 0) {
-                cons_putstr(cons, "Invalid .hrb file format.\n");
+                cons_putstr(cons, "맞지 않는 hrb 파일 형식.\n");
                 memman_free_4k(memman, (int) exec_buf, decomp_size);
                 return 0;
             }
             exec_size = decomp_size;
         } else {
-            cons_putstr(cons, "File decompression error.\n");
+            cons_putstr(cons, "파일 압축 해제 오류.\n");
             memman_free_4k(memman, (int) file_buf, file_size);
             return 0;
         }

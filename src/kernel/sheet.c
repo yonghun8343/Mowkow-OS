@@ -1,4 +1,4 @@
-// process overlay sheets (windows)
+// 윈도우 겹치기 처리를 위한 시트 관리
 
 #include "../include/bootpack.h"
 

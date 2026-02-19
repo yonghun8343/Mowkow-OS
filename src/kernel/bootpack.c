@@ -35,7 +35,6 @@ void HariMain(void)
 	struct CONSOLE *cons;												// console
 	struct SHEET *sht = 0, *key_win, *sht2;								// window sheet
 
-	// Declare Variables
 	// 1. Buffers
 	char s[40];															
 	int fifobuf[128], keycmd_buf[32];									// FIFO 버퍼
@@ -47,26 +46,6 @@ void HariMain(void)
 	// 3. Keyboard State Variables
 	int key_shift = 0, key_ctrl = 0, key_leds = (binfo->leds >> 4) & 7, keycmd_wait = -1;	// 키보드 상태 변수
 	// 4. Key Tables
-	// static char keytable0[0x80] = {
-	// 	0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0x08, 0,
-	// 	'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', 0x0a, 0x1D, 'A', 'S',
-	// 	'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', '\'', '`',   0,   '\\', 'Z', 'X', 'C', 'V',
-	// 	'B', 'N', 'M', ',', '.', '/', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   '7', '8', '9', '-', '4', '5', '6', '+', '1',
-	// 	'2', '3', '0', '.', 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0x5c, 0,  0,   0,   0,   0,   0,   0,   0,   0,   0x5c, 0,  0
-	// };
-	// static char keytable1[0x80] = {
-	// 	0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0x08, 0,
-	// 	'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0x0a, 0x1D, 'A', 'S',
-	// 	'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',   0,   '|', 'Z', 'X', 'C', 'V',
-	// 	'B', 'N', 'M', '<', '>', '?', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   '7', '8', '9', '-', '4', '5', '6', '+', '1',
-	// 	'2', '3', '0', '.', 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   '_', 0,   0,   0,   0,   0,   0,   0,   0,   0,   '|', 0,   0
-	// };
 	static char keytable0[0x80] = {
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0x7F, 0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', 0x0a, 0x1D, 'A', 'S',
@@ -126,38 +105,39 @@ void HariMain(void)
     init_screen8(buf_back, binfo->scrnx, binfo->scrny);                                     // 배경 화면 초기화
 
 	// 폰트 설정
-	int *fat, size_k = 0;
 	unsigned char *korean;
-	struct FILEINFO *finfo_e, *finfo_k;
-	extern char hankaku[4096];
-	
-	fat = (int *) memman_alloc_4k(memman, 4 * 2880); 										// FAT 테이블용 메모리 할당
-	file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));							// FAT 테이블 읽기
-	finfo_e = file_search("E2      FNT", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);		// 영문 폰트 파일 검색
-	finfo_k = file_search("H04     FNT", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);		// 한글 폰트 파일 검색
+	FDHANDLE fh;
+	int k_size = 0;
+	int k;
 
-	if (finfo_k != 0) {
-		size_k = finfo_k->size;
+	if (fd_open(&fh, "H04.FNT")) {
+		k_size = fh.finfo->size;
+		fd_close(&fh);
 	}
 
-	korean = (unsigned char *) memman_alloc_4k(memman, 4096 + size_k);						// 한글 폰트용 메모리 할당
-	if (finfo_e != 0) {
-		file_loadfile(finfo_e->clustno, finfo_e->size, korean, fat, (unsigned char *) (ADR_DISKIMG + 0x003e00));
+	korean = (unsigned char *) memman_alloc_4k(memman, 4096 + k_size);
+
+	if (fd_open(&fh, "E2.FNT")) {
+		fd_read(&fh, korean, fh.finfo->size);
+		fd_close(&fh);
 	} else {
-		for (i=0; i<4096; i++) {
-			korean[i] = hankaku[i];
+		extern char hankaku[4096];
+		for (k=0; k<4096; k++) {
+			korean[k] = hankaku[k];
 		}
 	}
-	if (finfo_k != 0) {
-		file_loadfile(finfo_k->clustno, finfo_k->size, korean + 4096, fat, (unsigned char *) (ADR_DISKIMG + 0x003e00));
+
+	if (k_size > 0 && fd_open(&fh, "H04.FNT")) {
+		fd_read(&fh, korean + 4096, k_size);
+		fd_close(&fh);
 	} else {
-        for (i = 0; i < size_k; i++) {
-            *(korean + 4096 + i) = 0;
-        }
-    }
+		for (k=0; k<k_size; k++) {
+			*(korean + 4096 + k) = 0;
+		}
+	}
+
 	system_font = korean;
-	*((int *) 0x0fe8) = (int) (korean + 4096);													// 한글 폰트 주소 저장 (0x0fe8)
-	memman_free_4k(memman, (int) fat, 4*2880);
+	*((int *) 0x0fe8) = (int) (korean + 4096);												// 한글 폰트 주소 저장 (0x0fe8)
 
     // 콘솔 시트 그리기
 	key_win = open_console(shtctl, memtotal, 1);												// 첫 번째 콘솔 창 열기
