@@ -920,28 +920,6 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         int size = ecx;
 
         reg[7] = fd_write(fh, buf, size);
-    } else if (edx == 29) { // api_fopen_rw(char *fname, int mode)
-        FDHANDLE *fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));
-
-        int mode = ecx;
-
-        cons_putstr(cons, "[KERNEL] fopen request: \n");
-        cons_putstr(cons, (char *)ebx + ds_base);
-        cons_newline(cons);
-
-        int result = 0;
-        if (mode == 0) {
-            result = fd_open(fh, (char *)ebx + ds_base);
-        } else {
-            result = fd_writeopen(fh, (char *)ebx + ds_base);
-        }
-
-        if (result == 0) {
-            memman_free_4k(memman, (int)fh, sizeof(FDHANDLE));
-            reg[7] = 0;
-        } else {
-            reg[7] = (int)fh;
-        }
     }
 
     return 0;

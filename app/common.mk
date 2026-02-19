@@ -70,8 +70,5 @@ $(OUT_ORG): $(BUILD_DIR)/$(APP).bim
 $(OUT_HRB): $(OUT_ORG)
 	$(BIM2BIN) -osacmp in:$< out:$@
 
-# $(OUT_HRB): $(BUILD_DIR)/$(APP).bim
-# 	$(BIM2HRB) $< $@ $(MALLOC)
-
 clean:
 	rm -rf $(BUILD_DIR)

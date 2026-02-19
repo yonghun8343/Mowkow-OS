@@ -125,6 +125,7 @@ $(IMG_DIR)/haribote.img : $(BUILD_DIR)/boot/ipl.bin $(BUILD_DIR)/haribote.sys $(
 		copy from:$(FONT_DIR)/H04.FNT to:@: \
 		copy from:testfiles/test.mk to:@: \
 		copy from:app/머꼬/library.scm to:@: \
+		copy from:testfiles/sanjini.jpg to:@: \
 		imgout:$@
 
 # Commands

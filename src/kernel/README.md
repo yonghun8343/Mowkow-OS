@@ -18,4 +18,9 @@
 - `bootpack.c` : 시스템 초기화 및 입출력 처리
 - `console.c` : 콘솔 태스크 관리
 - `dsctbl.c` : GDT/IDT 초기화 및 관리
-- `fd.c` : 
+- `fd.c` : 파일 기술자
+- `memory.c` : 메모리 관리자
+- `mtask.c` : 멀티 태스킹 지원
+- `naskfunc.nas` : 어셈블리로 구현된 함수 (하드웨어 직접 제어에 사용됨)
+- `sheet.c` : 창 겹치기 처리를 위한 시트
+- `window.c` : 창 관리자
