@@ -1,5 +1,3 @@
-// memory management
-
 /**
  * @file memory.c
  * @brief 메모리 관리 함수 구현

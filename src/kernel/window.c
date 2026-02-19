@@ -1,4 +1,9 @@
-// window management functions
+/**
+ * @file window.c
+ * 
+ * @brief 윈도우 생성 및 관리 함수 구현
+ * 
+ */
 
 #include "../include/bootpack.h"
 

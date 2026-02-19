@@ -1,4 +1,18 @@
-// console
+/**
+ * @file console.c
+ * 
+ * @brief 콘솔 관련 함수 구현
+ * 
+ * - 콘솔 태스크 함수: console_task
+ * - 콘솔에 문자 출력: cons_put_utf8
+ * - 명령어 처리 함수: cmd_help, cmd_cls, cmd_dir, cmd_type, cmd_exit
+ * - 콘솔 종료 처리: cmd_exit
+ * - 기타 유틸리티 함수: cons_newline, cons_putchar
+ * - 한글 입력 처리 포함
+ * - 파일 시스템 관련 함수: cmd_dir
+ * - 콘솔 시트 업데이트 및 커서 제어 포함
+ * - api 구현 함수: hrb_api
+ */
 
 #include "../include/bootpack.h"
 #include "../include/utf8.h"

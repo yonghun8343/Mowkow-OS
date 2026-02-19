@@ -1,4 +1,9 @@
-// GDT/IDT descriptor table structures and functions
+/** 
+ * @file dsctbl.c
+ * 
+ * @brief GDT/IDT 구조체 정의 및 초기화 함수 구현
+ * 
+ * */
 #include "../include/bootpack.h"
 
 /**

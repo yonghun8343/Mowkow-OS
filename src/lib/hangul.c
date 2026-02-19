@@ -1,3 +1,9 @@
+/**
+ * @file hangul.c
+ * 
+ * @brief 한글 입출력 처리 함수 구현
+ */
+
 #include "../include/bootpack.h"
 #include "../include/hangul.h"
 
