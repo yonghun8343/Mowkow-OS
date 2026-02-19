@@ -1,9 +1,12 @@
 /**
  * @file graphic.c
+ * 
  * @brief 그래픽 드라이버 관련 함수 구현
+ * 
+ * 하리보테 OS는 VRAM에 직접 접근하여 그래픽을 처리함.
+ * 
  */
 
-#include "../include/asmfunc.h"
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
 #include "../include/hangul.h"
@@ -19,24 +22,24 @@ unsigned char *system_font = (unsigned char *) hankaku; // 기본 시스템 폰�
 void init_palette(void)
 {
     // static char -> DB intruction
-    // it can use only data
+    // static char로 선언된 변수는 어셈블리에서 DB 명령어로 변환됨
     static unsigned char table_rgb[16 * 3] = {
-        0x00, 0x00, 0x00,   // 0: black
-        0xff, 0x00, 0x00,   // 1: bright red
-        0x00, 0xff, 0x00,   // 2: bright green
-        0xff, 0xff, 0x00,   // 3: bright yellow
-        0x00, 0x00, 0xff,   // 4: bright blue
-        0xff, 0x00, 0xff,   // 5: bright purple
-        0x00, 0xff, 0xff,   // 6: bright light blue
-        0xff, 0xff, 0xff,   // 7: white
-        0xc6, 0xc6, 0xc6,   // 8: light gray
-        0x84, 0x00, 0x00,   // 9: dark red
-        0x00, 0x84, 0x00,   // 10: dark green
-        0x84, 0x84, 0x00,   // 11: dark yellow
-        0x00, 0x00, 0x84,   // 12: dark blue
-        0x84, 0x00, 0x84,   // 13: dark purple
-        0x00, 0x84, 0x84,   // 14: dark light blue
-        0x84, 0x84, 0x84    // 15: dark gray
+        0x00, 0x00, 0x00,   // 0: 검정
+        0xff, 0x00, 0x00,   // 1: 밝은 빨강
+        0x00, 0xff, 0x00,   // 2: 밝은 초록
+        0xff, 0xff, 0x00,   // 3: 밝은 노랑
+        0x00, 0x00, 0xff,   // 4: 밝은 파랑
+        0xff, 0x00, 0xff,   // 5: 밝은 보라
+        0x00, 0xff, 0xff,   // 6: 밝은 하늘색
+        0xff, 0xff, 0xff,   // 7: 흰색
+        0xc6, 0xc6, 0xc6,   // 8: 연한 회색
+        0x84, 0x00, 0x00,   // 9: 어두운 빨강
+        0x00, 0x84, 0x00,   // 10: 어두운 초록
+        0x84, 0x84, 0x00,   // 11: 어두운 노랑
+        0x00, 0x00, 0x84,   // 12: 어두운 파랑
+        0x84, 0x00, 0x84,   // 13: 어두운 보라
+        0x00, 0x84, 0x84,   // 14: 어두운 하늘색
+        0x84, 0x84, 0x84    // 15: 어두운 회색
     };
     set_palette(0, 15, table_rgb);
     unsigned char table2[216 * 3]; // 6 * 6 * 6 = 216 colors

@@ -1,5 +1,9 @@
-// keyboard controller implementation
-#include "../include/asmfunc.h"
+/**
+ * @file keyboard.c
+ * 
+ * @brief 키보드 인터럽트 핸들러 및 초기화 함수 구현
+ * 
+ */
 #include "../include/bootpack.h"
 
 struct FIFO32 *keyfifo;
@@ -16,7 +20,7 @@ int keydata0;
 void inthandler21(int *esp)
 {
     int data;
-    io_out8(PIC0_OCW2, 0x61); // notify PIC0 that IRQ-01 has been handled
+    io_out8(PIC0_OCW2, 0x61); // PIC0에 IRQ-01이 처리되었음을 알림
     data = io_in8(PORT_KEYDAT);
     fifo32_put(keyfifo, data + keydata0);
     
