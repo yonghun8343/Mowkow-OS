@@ -809,13 +809,10 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         case 3:
             if (idx_jung != -1) {
                 // 종성 분리 (예: 각ㅏ -> 가가)
-                int prev_cho = hangul->cho;
-                int prev_jung = hangul->jung;
-                int prev_jong = hangul->jong;
+                int next_cho = jong2cho[hangul->jong]; // 종성->초성 변환
 
-                update_prev_hangul(cons, task, 2, prev_cho, prev_jung, -1);
+                update_prev_hangul(cons, task, 2, hangul->cho, hangul->jung, -1);
 
-                int next_cho = jong2cho[prev_jong]; // 종성->초성 변환
                 if (next_cho != -1) {
                     start_new_hangul(cons, task, 2, next_cho, idx_jung, -1, cmdline);
                 } else {
@@ -839,15 +836,11 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         // state 4: 초성+중성+복합종성 입력된 상태
         case 4:
             if (idx_jung != -1) {
-                // 모음 입력 -> 겹받침 분해
-                // 예: 값 + ㅏ -> 갑사
-                
-                // 현재 겹받침 인덱스
-                int complex_jong = hangul->jong;
+                // 모음 입력 -> 겹받침 분해 (예: 값 + ㅏ -> 갑사)
 
                 // 겹받침 분해
-                int prev_jong_part = get_first_jong(complex_jong);
-                int next_cho_part = get_second_jong(complex_jong);
+                int prev_jong_part = get_first_jong(hangul->jong);
+                int next_cho_part = get_second_jong(hangul->jong);
 
                 // 앞 글자 다시 그리기
                 update_prev_hangul(cons, task, 3, hangul->cho, hangul->jung, prev_jong_part);
