@@ -56,13 +56,21 @@ APP_TARGETS = $(foreach app, $(APPS), $(BUILD_DIR)/app/$(app)/$(app).hrb)
 default : $(IMG_DIR)/haribote.img
 
 # Bootloader Build
-$(BUILD_DIR)/boot/ipl.bin : $(SRC_DIR)/boot/ipl.nas
-	@$(MKDIR) $(BUILD_DIR)/boot
-	$(NASK) $< $@ $(subst .bin,.lst,$@)
+# $(BUILD_DIR)/boot/ipl.bin : $(SRC_DIR)/boot/ipl.nas
+# 	@$(MKDIR) $(BUILD_DIR)/boot
+# 	$(NASK) $< $@ $(subst .bin,.lst,$@)
 
-$(BUILD_DIR)/boot/asmhead.bin : $(SRC_DIR)/boot/asmhead.nas
+# $(BUILD_DIR)/boot/asmhead.bin : $(SRC_DIR)/boot/asmhead.nas
+# 	@$(MKDIR) $(BUILD_DIR)/boot
+# 	$(NASK) $< $@ $(subst .bin,.lst,$@)
+
+$(BUILD_DIR)/boot/ipl.bin : ASM/ipl.bin
 	@$(MKDIR) $(BUILD_DIR)/boot
-	$(NASK) $< $@ $(subst .bin,.lst,$@)
+	$(COPY) $< $@
+
+$(BUILD_DIR)/boot/asmhead.bin : ASM/asmhead.bin
+	@$(MKDIR) $(BUILD_DIR)/boot
+	$(COPY) $< $@
 
 # Kernel & Drivers Build (c -> obj)
 $(BUILD_DIR)/%.obj : $(SRC_DIR)/%.c

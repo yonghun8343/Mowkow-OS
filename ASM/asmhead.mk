@@ -266,4 +266,4 @@
 (쓰기 최종)
 
 ; Program body
-(굽기 "./asmhead.bin" 최종)
+(굽기 "/asmhead.bin" 최종)
