@@ -51,14 +51,16 @@ Mowkow OS는 저서 『OS 구조와 원리』를 기반으로 제작된 교육�
 
 ### 3-0. ⚠️중요⚠️
 
-0. 컴퓨터에 QEMU가 설치되어있는지 확인합니다.
+0. 컴퓨터에 QEMU와 make가 설치되어있는지 확인합니다.
 
     - QEMU가 설치되어있지 않은 경우 아래 링크에서 설치합니다. <br>
     https://www.qemu.org/download/
+    - make가 설치되어있지 않은 경우 아래 링크에서 설치합니다. <br>
+    https://gnuwin32.sourceforge.net/packages/make.htm
 
 ### 3-1. 이미지 파일이 있는 경우
 
-1. QEMU가 설치되었을 경우 본인의 경로에 맞게 아래 명령어를 입력합니다.<br>
+1. QEMU가 설치되었다면 본인의 경로에 맞게 아래 명령어를 입력합니다.<br>
     `<QEMU 경로> -fda <IMG 경로> -no-reboot -d int -m 512M`
 
 ### 3-2. 이미지 파일이 없는 경우
