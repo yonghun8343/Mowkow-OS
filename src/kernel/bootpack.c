@@ -1,4 +1,10 @@
-// bootpack.c
+/**
+ * @file bootpack.c
+ * 
+ * @brief OS 시스템 설정 초기화 및 메인 루프(입출력 처리) 실행
+ * 
+ * - 시스템 초기화: GDT/IDT, PIC, PIT, FDC, 키보드, 마우스, 메모리 관리자, 그래픽 디스플레이, 시스템 폰트 불러오기
+ */
 
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
@@ -35,38 +41,15 @@ void HariMain(void)
 	struct CONSOLE *cons;												// console
 	struct SHEET *sht = 0, *key_win, *sht2;								// window sheet
 
-	// Declare Variables
-	// 1. Buffers
 	char s[40];															
 	int fifobuf[128], keycmd_buf[32];									// FIFO 버퍼
 	unsigned char *buf_back, buf_mouse[256];							// 시트용 버퍼: 배경, 마우스, 콘솔
-	// 2. Positions and Indexes
+
 	int mx, my, i, new_mx = -1, new_my = 0, new_wx = 0x7fffffff, new_wy = 0; // 마우스와 커서용 변수
 	unsigned int memtotal;												// 총 메모리 크기
 	int j, x, y, mmx = -1, mmy = -1, mmx2 = 0;							// 마우스에 의한 윈도우 이동 모드용 변수
-	// 3. Keyboard State Variables
+
 	int key_shift = 0, key_ctrl = 0, key_leds = (binfo->leds >> 4) & 7, keycmd_wait = -1;	// 키보드 상태 변수
-	// 4. Key Tables
-	// static char keytable0[0x80] = {
-	// 	0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0x08, 0,
-	// 	'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', 0x0a, 0x1D, 'A', 'S',
-	// 	'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', '\'', '`',   0,   '\\', 'Z', 'X', 'C', 'V',
-	// 	'B', 'N', 'M', ',', '.', '/', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   '7', '8', '9', '-', '4', '5', '6', '+', '1',
-	// 	'2', '3', '0', '.', 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0x5c, 0,  0,   0,   0,   0,   0,   0,   0,   0,   0x5c, 0,  0
-	// };
-	// static char keytable1[0x80] = {
-	// 	0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0x08, 0,
-	// 	'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0x0a, 0x1D, 'A', 'S',
-	// 	'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',   0,   '|', 'Z', 'X', 'C', 'V',
-	// 	'B', 'N', 'M', '<', '>', '?', 0,   '*', 0,   ' ', 0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   '7', '8', '9', '-', '4', '5', '6', '+', '1',
-	// 	'2', '3', '0', '.', 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-	// 	0,   0,   0,   '_', 0,   0,   0,   0,   0,   0,   0,   0,   0,   '|', 0,   0
-	// };
 	static char keytable0[0x80] = {
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0x7F, 0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', 0x0a, 0x1D, 'A', 'S',
@@ -100,8 +83,11 @@ void HariMain(void)
 
 	init_keyboard(&fifo, 256); 											    // 키보드 초기화
 	enable_mouse(&fifo, 512, &mdec); 										// 마우스 활성화
+
+	// 주의: 추가적인 인터럽트가 필요할 경우, 하단의 io_out8(PIC0_IMR, ...) 및 io_out8(PIC1_IMR, ...) 부분도 수정해야 함
 	io_out8(PIC0_IMR, 0xb8); 												// PIT, PIC1, 키보드, FDC 허용(10111000)
 	io_out8(PIC1_IMR, 0xef); 												// 마우스 허용(11101111)
+
 	fifo32_init(&keycmd, 32, keycmd_buf, 0); 								// 키보드 명령 FIFO 버퍼
 
     // 메모리 관리자 초기화
@@ -126,38 +112,39 @@ void HariMain(void)
     init_screen8(buf_back, binfo->scrnx, binfo->scrny);                                     // 배경 화면 초기화
 
 	// 폰트 설정
-	int *fat, size_k = 0;
 	unsigned char *korean;
-	struct FILEINFO *finfo_e, *finfo_k;
-	extern char hankaku[4096];
-	
-	fat = (int *) memman_alloc_4k(memman, 4 * 2880); 										// FAT 테이블용 메모리 할당
-	file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));							// FAT 테이블 읽기
-	finfo_e = file_search("E2      FNT", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);		// 영문 폰트 파일 검색
-	finfo_k = file_search("H04     FNT", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);		// 한글 폰트 파일 검색
+	FDHANDLE fh;
+	int k_size = 0;
+	int k;
 
-	if (finfo_k != 0) {
-		size_k = finfo_k->size;
+	if (fd_open(&fh, "H04.FNT")) {	// 한글 폰트 있는지 확인
+		k_size = fh.finfo->size;
+		fd_close(&fh);
 	}
 
-	korean = (unsigned char *) memman_alloc_4k(memman, 4096 + size_k);						// 한글 폰트용 메모리 할당
-	if (finfo_e != 0) {
-		file_loadfile(finfo_e->clustno, finfo_e->size, korean, fat, (unsigned char *) (ADR_DISKIMG + 0x003e00));
+	korean = (unsigned char *) memman_alloc_4k(memman, 4096 + k_size);
+
+	if (fd_open(&fh, "E2.FNT")) {	// 영문 폰트가 있으면 불러오기
+		fd_read(&fh, korean, fh.finfo->size);
+		fd_close(&fh);
 	} else {
-		for (i=0; i<4096; i++) {
-			korean[i] = hankaku[i];
+		extern char hankaku[4096];	// 없으면 기본 영문 폰트 사용
+		for (k=0; k<4096; k++) {
+			korean[k] = hankaku[k];
 		}
 	}
-	if (finfo_k != 0) {
-		file_loadfile(finfo_k->clustno, finfo_k->size, korean + 4096, fat, (unsigned char *) (ADR_DISKIMG + 0x003e00));
-	} else {
-        for (i = 0; i < size_k; i++) {
-            *(korean + 4096 + i) = 0;
-        }
-    }
+
+	if (k_size > 0 && fd_open(&fh, "H04.FNT")) {	// 한글 폰트가 있으면 불러오기
+		fd_read(&fh, korean + 4096, k_size);
+		fd_close(&fh);
+	} else {										// 없으면 한글 폰트 영역을 0으로 초기화
+		for (k=0; k<k_size; k++) {
+			*(korean + 4096 + k) = 0;
+		}
+	}
+
 	system_font = korean;
-	*((int *) 0x0fe8) = (int) (korean + 4096);													// 한글 폰트 주소 저장 (0x0fe8)
-	memman_free_4k(memman, (int) fat, 4*2880);
+	*((int *) 0x0fe8) = (int) (korean + 4096);												// 한글 폰트 주소 저장 (0x0fe8)
 
     // 콘솔 시트 그리기
 	key_win = open_console(shtctl, memtotal, 1);												// 첫 번째 콘솔 창 열기
@@ -177,7 +164,7 @@ void HariMain(void)
 	// 시트 디스플레이 순서 설정
 	sheet_updown(sht_back,     0);
 	sheet_updown(key_win,      1);
-	sheet_updown(sht_mouse,    2);
+	sheet_updown(sht_mouse,    2); // 마우스는 항상 제일 위에 디스플레이
 
 	// 키보드 활성화된 윈도우로 설정
 	keywin_on(key_win);
@@ -198,30 +185,32 @@ void HariMain(void)
 		io_cli(); // CPU 인터럽트 비활성화
 		// FIFO 버퍼 상태 확인
 		if (fifo32_status(&fifo) == 0) { 						// fifo가 비어있음
-			if (new_mx >= 0) { 									// 마우스 이동이 있으면
-				io_sti(); 										// CPU 인터럽트 활성화
-				sheet_slide(sht_mouse, new_mx, new_my); 		// 마우스 시트 이동
-				new_mx = -1; 									// 마우스 x 위치 초기화
-			} else if (new_wx != 0x7fffffff) { 					// 윈도우 이동이 있으면
-				io_sti(); 										// CPU 인터럽트 활성화
-				sheet_slide(sht, new_wx, new_wy); 				// 윈도우 시트 이동
-				new_wx = 0x7fffffff; 							// 윈도우 x 위치 초기화
-			} else {											// 할 일이 없으면, 휴면
-            	task_sleep(task_a); 							// 태스크 a 휴면
-				io_sti(); 										// CPU 인터럽트 활성화
+			if (new_mx >= 0) { 										// 마우스 이동이 있으면
+				io_sti(); 												// CPU 인터럽트 활성화
+				sheet_slide(sht_mouse, new_mx, new_my); 				// 마우스 시트 이동
+				new_mx = -1; 											// 마우스 x 위치 초기화
+			} else if (new_wx != 0x7fffffff) { 						// 윈도우 이동이 있으면
+				io_sti(); 												// CPU 인터럽트 활성화
+				sheet_slide(sht, new_wx, new_wy); 						// 윈도우 시트 이동
+				new_wx = 0x7fffffff; 									// 윈도우 x 위치 초기화
+			} else {												// 할 일이 없으면, 휴면
+            	task_sleep(task_a); 									// 태스크 a 휴면
+				io_sti(); 												// CPU 인터럽트 활성화
 			}
 		} else { 												// fifo가 비어있지 않음
-			i = fifo32_get(&fifo); 								// FIFO 버퍼에서 데이터 가져오기
-			io_sti(); 											// CPU 인터럽트 활성화
-			if (key_win != 0 && key_win->flags == 0) { 			// key_win이 닫혀 있음
-				if (shtctl->top == 1) { 						// 배경 시트만 남음
-					key_win = 0; 								// 활성 윈도우 없음
-				} else {										// 다음 최상위 시트로 전환
-					key_win = shtctl->sheets[shtctl->top - 1]; 	// 다음 최상위 시트
-					keywin_on(key_win); 						// 활성화
+			i = fifo32_get(&fifo); 									// FIFO 버퍼에서 데이터 가져오기
+			io_sti(); 												// CPU 인터럽트 활성화
+			if (key_win != 0 && key_win->flags == 0) { 				// key_win이 닫혀 있음
+				if (shtctl->top == 1) { 								// 배경 시트만 남음
+					key_win = 0; 											// 활성 윈도우 없음
+				} else {												// 다음 최상위 시트로 전환
+					key_win = shtctl->sheets[shtctl->top - 1]; 				// 다음 최상위 시트
+					keywin_on(key_win); 									// 해당 윈도우 키 입력 활성화
 				}
 			}
 			// 키보드 데이터 처리 로직
+			// 키보드 데이터는 256 이상으로 구분하여 처리 
+			// (0-255: 타이머, 256-511: 키보드, 512-767: 마우스, 768-1023: 콘솔 종료, 1024-2023: 콘솔 태스크 종료, 2024-2279: 콘솔만 종료)
 			if (256 <= i && i <= 511) {
                 if (i < 256+0x80) { 					// 문자로 변환
 					if (key_shift == 0) { 				// 소문자
@@ -242,6 +231,8 @@ void HariMain(void)
                     fifo32_put(&key_win->task->fifo, s[0] + 256);		// 활성된 윈도우에 문자 전송
                 }
 				if (i == 256 + 0x0f && key_win != 0) { 					// tab 키 눌림
+
+					// 교재의 tab 키는 윈도우 전환이었으나, 나노에서 tab 사용시 기능이 충돌되어 비활성화
 					// keywin_off(key_win);
 					// j = key_win->height - 1;
 					// if (j == 0) {
@@ -249,7 +240,8 @@ void HariMain(void)
 					// }
 					// key_win = shtctl->sheets[j];
 					// keywin_on(key_win);
-					fifo32_put(&key_win->task->fifo, 0xFE + 256);
+
+					fifo32_put(&key_win->task->fifo, 0xFE + 256); // 0xFE: tab 키에 대한 가상 제어 문자
 				}
 				if (i == 256 + 0x2a) { // left shift 눌림
 					key_shift |= 1;
@@ -285,7 +277,8 @@ void HariMain(void)
 					fifo32_put(&keycmd, key_leds);
 				}
 				if (i == 256 + 0x39 && key_shift != 0) {
-					fifo32_put(&key_win->task->fifo, 256 + 0xFF); // Shift + Space 가상 제어 문자
+					// 한영 전환
+					fifo32_put(&key_win->task->fifo, 256 + 0xFF); // 0xFF: Shift + Space 가상 제어 문자
 				}
 				if (i == 256 + 0x57) { // F11 눌림
 					sheet_updown(shtctl->sheets[1], shtctl->top - 1); // 콘솔을 제일 위로 가져옴(마우스 바로 아래)
@@ -298,6 +291,7 @@ void HariMain(void)
 					io_out8(PORT_KEYCMD, keycmd_wait);
 				}
 				if (i == 256 + 0x2e && key_ctrl != 0 && key_win != 0) { // Ctrl + C 눌림
+					// 프로세스 강제 종료
 					task = key_win->task;
 					if (task != 0 && task->tss.ss0 != 0) {
 						cons_putstr(task->cons, "\nBreak(key) :\n");
@@ -309,6 +303,7 @@ void HariMain(void)
 					}
 				}
 				if (i == 256 + 0x3c && key_shift != 0) { // Shift + F2 눌림
+					// 콘솔 창 열기
 					if (key_win != 0) {
 						keywin_off(key_win);
 					}

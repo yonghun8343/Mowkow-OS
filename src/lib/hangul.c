@@ -1,8 +1,15 @@
+/**
+ * @file hangul.c
+ * 
+ * @brief 한글 입출력 처리 함수 구현
+ */
+
 #include "../include/bootpack.h"
 #include "../include/hangul.h"
 
 // =====================================================================================================================
 // 조합형 코드 매핑 테이블
+// 한글 렌더링을 위해 초성, 중성, 종성의 인덱스와 벌 수를 저장하는 테이블
 // =====================================================================================================================
 
 // 한글 음소 인덱스 테이블
@@ -39,13 +46,14 @@ static int CompatChoToChoIdx[30] = {
 };
 
 // =====================================================================================================================
-// 유니코드 -> 조합형 코드 매핑 테이블
+// 조합형 코드 매핑 테이블 (U2J 테이블)
+// U2J: Unicode to Johab (유니코드 -> 조합형 코드) 매핑 테이블
+// 논리 인덱스(0, 1, 2)를 폰트 시스템이 이해할 수 있는 5비트짜리 조합형 코드 인덱스로 변환합니다.
+// 주의: 테이블의 인덱스와 해당 인덱스에 저장된 조합형 코드 값을 혼동하면 안됨
 // =====================================================================================================================
 
 /**
- * @brief 유니코드->초성조합코드 매핑 테이블
- * 
- * 주의: 테이블의 인덱스와 해당 인덱스에 저장된 조합형 코드 값을 혼동하면 안됨
+ * @brief 입력->초성조합코드 매핑 테이블
  */
 static unsigned char U2J_cho[19] = {
     2, 3, 4, 5, 6,          // 0:ㄱ, 1:ㄲ, 2:ㄴ, 3:ㄷ, 4:ㄸ
@@ -54,9 +62,7 @@ static unsigned char U2J_cho[19] = {
     17, 18, 19, 20          // 15:ㅋ, 16:ㅌ, 17:ㅍ, 18:ㅎ
 };
 /**
- * @brief 유니코드->중성조합코드 매핑 테이블
- * 
- * 주의: 테이블의 인덱스와 해당 인덱스에 저장된 조합형 코드 값을 혼동하면 안됨
+ * @brief 입력->중성조합코드 매핑 테이블
  */
 static unsigned char U2J_jung[21] = {
     3, 4, 5, 6, 7,             // 0:ㅏ, 1:ㅐ, 2:ㅑ, 3:ㅒ, 4:ㅓ
@@ -65,9 +71,7 @@ static unsigned char U2J_jung[21] = {
     26, 27, 28, 29             // 17:ㅠ, 18:ㅡ, 19:ㅢ, 20:ㅣ
 };
 /**
- * @brief 유니코드->종성조합코드 매핑 테이블
- * 
- * 주의: 테이블의 인덱스와 해당 인덱스에 저장된 조합형 코드 값을 혼동하면 안됨
+ * @brief 입력->종성조합코드 매핑 테이블
  */
 static unsigned char U2J_jong[28] = {
     0, // 0: 받침 없음
@@ -78,7 +82,7 @@ static unsigned char U2J_jong[28] = {
 };
 
 // =====================================================================================================================
-// ASCII 코드 -> 유니코드 인덱스 매핑 테이블
+// ASCII 코드 -> U2J 인덱스 매핑 테이블
 // =====================================================================================================================
 
 static char KeyToChoIdx[128] = {
@@ -744,7 +748,7 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
     char s[2];
     int idx_cho, idx_jung, idx_jong;
 
-    // key(ASCII) -> UTF-8 인덱스
+    // key(ASCII) -> 한글 자모 테이블 인덱스
     idx_cho = key2cho(key);     // 초성 인덱스
     idx_jung = key2jung(key);   // 중성 인덱스
     idx_jong = key2jong(key);   // 종성 인덱스
@@ -794,7 +798,7 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
                 } else {    
                     // 조합 불가
                     // 앞 글자 확정 후 새 글자 시작
-                    start_new_hangul(cons, task, 2, -1, idx_jung, -1, cmdline);
+                    start_new_hangul(cons, task, 0, -1, idx_jung, -1, cmdline);
                 }
             } else {
                 // 한글 아님 -> 앞 글자 확정 후 새 글자 시작
@@ -805,13 +809,10 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         case 3:
             if (idx_jung != -1) {
                 // 종성 분리 (예: 각ㅏ -> 가가)
-                int prev_cho = hangul->cho;
-                int prev_jung = hangul->jung;
-                int prev_jong = hangul->jong;
+                int next_cho = jong2cho[hangul->jong]; // 종성->초성 변환
 
-                update_prev_hangul(cons, task, 2, prev_cho, prev_jung, -1);
+                update_prev_hangul(cons, task, 2, hangul->cho, hangul->jung, -1);
 
-                int next_cho = jong2cho[prev_jong]; // 종성->초성 변환
                 if (next_cho != -1) {
                     start_new_hangul(cons, task, 2, next_cho, idx_jung, -1, cmdline);
                 } else {
@@ -835,15 +836,11 @@ void hangul_automata(struct CONSOLE *cons, struct TASK *task, int key, char *cmd
         // state 4: 초성+중성+복합종성 입력된 상태
         case 4:
             if (idx_jung != -1) {
-                // 모음 입력 -> 겹받침 분해
-                // 예: 값 + ㅏ -> 갑사
-                
-                // 현재 겹받침 인덱스
-                int complex_jong = hangul->jong;
+                // 모음 입력 -> 겹받침 분해 (예: 값 + ㅏ -> 갑사)
 
                 // 겹받침 분해
-                int prev_jong_part = get_first_jong(complex_jong);
-                int next_cho_part = get_second_jong(complex_jong);
+                int prev_jong_part = get_first_jong(hangul->jong);
+                int next_cho_part = get_second_jong(hangul->jong);
 
                 // 앞 글자 다시 그리기
                 update_prev_hangul(cons, task, 3, hangul->cho, hangul->jung, prev_jong_part);

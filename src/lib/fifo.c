@@ -1,4 +1,9 @@
-// FIFO Buffer
+/**
+ * @file fifo.c
+ * 
+ * @brief FIFO 버퍼 관련 함수 구현
+ * 
+ */
 
 #include "../include/bootpack.h"
 

@@ -1,3 +1,9 @@
+/**
+ * @file tek.c
+ * 
+ * @brief TEK 압축 및 해제 알고리즘 함수 구현
+ * 
+ */
 #include "../include/bootpack.h"
 #include <setjmp.h>
 #include <string.h>

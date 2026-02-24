@@ -1,5 +1,12 @@
-// interrupt
-#include "../include/asmfunc.h"
+/**
+ * @file int.c
+ * 
+ * @brief 인터럽트 관련 함수 구현
+ * 
+ * PIC 초기화 및 스푸리어스 인터럽트 핸들러 구현
+ * 
+ */
+
 #include "../include/bootpack.h"
 #include <stdio.h>
 

@@ -1,3 +1,10 @@
+/**
+ * @file fd.c
+ * 
+ * @brief FDC(Floppy Disk Controller) 관련 함수 구현
+ * 
+ */
+
 #include "../include/bootpack.h"
 #include "../include/fd.h"
 #include <string.h>

@@ -8,7 +8,6 @@
 #include "timer.h"
 #include "graphic.h"
 #include "window.h"
-#include "file.h"
 #include "fd.h"
 
 // font data
@@ -76,7 +75,7 @@ struct TASK {
     struct FDHANDLE *fhandle;
     int fhandle_count;
 
-    int *fat;                           // 파일 할당 테이블
+    // int *fat;                           // 파일 할당 테이블
     char *cmdline;                      // 명령어 버퍼
     char langmode;                      // 언어 모드 (0: 영어, 1: 한국어)
     struct HANGUL hangul;               // 한글 오토마타 상태
@@ -111,26 +110,22 @@ struct CONSOLE {
     int cmd_pos;
     struct TIMER *timer;
 };
-struct FILEHANDLE {
-    char *buf;
-    int size;
-    int pos;
-};
+
 void console_task(struct SHEET *sht, int memtotal, int langmode);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_put_utf8(struct CONSOLE *cons, char *s, int len, char move);
 void cons_putstr(struct CONSOLE *cons, char *s);
 void cons_newline(struct CONSOLE *cons);
-void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal);
+void cons_runcmd(char *cmdline, struct CONSOLE *cons, int memtotal);
 void cmd_mem(struct CONSOLE *cons, int memtotal);
 void cmd_cls(struct CONSOLE *cons);
 void cmd_dir(struct CONSOLE *cons);
-void cmd_exit(struct CONSOLE *cons, int *fat);
+void cmd_exit(struct CONSOLE *cons);
 void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode);
 void cmd_ncst(struct CONSOLE *cons, char *cmdline, int memtotal, int langmode);
 void cmd_langmode(struct CONSOLE *cons, char *cmdline);
 void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col);
-int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline);
+int cmd_app(struct CONSOLE *cons, char *cmdline);
 int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int eax);
 int *inthandler0c(int *esp);
 int *inthandler0d(int *esp);

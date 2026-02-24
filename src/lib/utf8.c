@@ -1,3 +1,10 @@
+/**
+ * @file utf8.c
+ * 
+ * @brief UTF-8 인코딩 관련 함수 구현
+ * 
+ */
+
 #include "../include/utf8.h"
 
 /**

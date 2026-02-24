@@ -1,8 +1,21 @@
-// console
+/**
+ * @file console.c
+ * 
+ * @brief 콘솔 관련 함수 구현
+ * 
+ * - 콘솔 태스크 함수: console_task
+ * - 콘솔에 문자 출력: cons_put_utf8
+ * - 명령어 처리 함수: cmd_help, cmd_cls, cmd_dir, cmd_type, cmd_exit
+ * - 콘솔 종료 처리: cmd_exit
+ * - 기타 유틸리티 함수: cons_newline, cons_putchar
+ * - 한글 입력 처리 포함
+ * - 파일 시스템 관련 함수: cmd_dir
+ * - 콘솔 시트 업데이트 및 커서 제어 포함
+ * - api 구현 함수: hrb_api
+ */
 
 #include "../include/bootpack.h"
 #include "../include/utf8.h"
-#include "../include/fd.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -25,9 +38,9 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
 {
     struct TASK *task = task_now();                                     // 현재 태스크 포인터 얻기
     struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;              // 메모리 관리자 포인터
-    int i, *fat = (int *) memman_alloc_4k(memman, 4 * 2880);            // FAT 테이블용 메모리 할당
+    int i;
 	struct CONSOLE cons;                                                // 콘솔 구조체
-    struct FILEHANDLE fhandle[8];                                       // 파일 핸들 구조체 배열
+    FDHANDLE fhandle[8];                                                // 파일 핸들 구조체 배열
     char cmdline[256];                                                  // 명령어 입력 버퍼
 
     // 콘솔 구조체 초기화
@@ -44,12 +57,8 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
         timer_init(cons.timer, &task->fifo, 1);
         timer_settime(cons.timer, 50);
     }
-    file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));      // FAT 테이블 읽기
-    for (i=0; i<8; i++) {
-        fhandle[i].buf = 0; // 미사용
-    }
     task->fhandle = fhandle;        // 파일 핸들 배열 설정
-    task->fat = fat;                // FAT 테이블 설정
+    task->fhandle_count = 8;        // 열린 파일 핸들 개수
 
     task->langmode = langmode;       // 언어모드 설정
     set_hangul(task, 0, -1, -1, -1); // 한글 오토마타 초기화
@@ -91,7 +100,7 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
 				cons.cur_c = -1;
 			}
             if (i == 4) {
-                cmd_exit(&cons, fat); // 콘솔 종료
+                cmd_exit(&cons); // 콘솔 종료
             }
 			if (256 <= i && i <= 511) {
 				if (i == 127 + 256) {                                         // backspace: 지우기
@@ -126,9 +135,9 @@ void console_task(struct SHEET *sht, int memtotal, int langmode)
                     // cons_debug(&cons, cmdline);    // 디버그용
                     
                     cons_newline(&cons);                        // 줄바꿈
-                    cons_runcmd(cmdline, &cons, fat, memtotal); // 명령어 실행
+                    cons_runcmd(cmdline, &cons, memtotal); // 명령어 실행
                     if (cons.sht == 0) {                        // 콘솔 시트가 없으면
-                        cmd_exit(&cons, fat);                   // 콘솔 태스크 종료
+                        cmd_exit(&cons);                   // 콘솔 태스크 종료
                     }
                     cons_put_utf8(&cons, ">", 1, 1);                // 프롬프트 출력
 				} else if (i == 0xFF) {	// Shift + Space
@@ -315,20 +324,19 @@ void cons_newline(struct CONSOLE *cons)
  * 
  * @param cmdline: 명령어 문자열
  * @param cons: 콘솔 구조체 포인터
- * @param fat: FAT 테이블 포인터
  * @param memtotal: 총 메모리 크기
  * @return: void 
  */
-void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
+void cons_runcmd(char *cmdline, struct CONSOLE *cons, int memtotal)
 {
-    if ((strcmp(cmdline, "mem") == 0 || strcmp(cmdline, "메모리") == 0) && cons->sht != 0) {        // 가능
+    if ((strcmp(cmdline, "mem") == 0 || strcmp(cmdline, "메모리") == 0) && cons->sht != 0) {
         cmd_mem(cons, memtotal);
-    } else if ((strcmp(cmdline, "cls") == 0 || strcmp(cmdline, "clear") == 0 || strcmp(cmdline, "지우기") == 0) && cons->sht != 0) {    // 가능
+    } else if ((strcmp(cmdline, "cls") == 0 || strcmp(cmdline, "clear") == 0 || strcmp(cmdline, "지우기") == 0) && cons->sht != 0) {
         cmd_cls(cons);
-    } else if ((strcmp(cmdline, "dir") == 0 || strcmp(cmdline, "ls") == 0 || strcmp(cmdline, "목록") == 0) && cons->sht != 0) {   // 가능
+    } else if ((strcmp(cmdline, "dir") == 0 || strcmp(cmdline, "ls") == 0 || strcmp(cmdline, "목록") == 0) && cons->sht != 0) {
         cmd_dir(cons);
     } else if ((strcmp(cmdline, "exit") == 0 || strcmp(cmdline, "종료") == 0)) {
-        cmd_exit(cons, fat);
+        cmd_exit(cons);
     } else if (strncmp(cmdline, "start ", 6) == 0 || strncmp(cmdline, "실행 ", 3) == 0) {
         cmd_start(cons, cmdline, memtotal, cons->sht->task->langmode);
     } else if (strncmp(cmdline, "ncst ", 5) == 0 || strncmp(cmdline, "바로실행 ", 5) == 0) {
@@ -338,7 +346,7 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
     } else if (strncmp(cmdline, "touch ", 6) == 0) {
         cmd_touch(cons, cmdline);
     } else if (cmdline[0] != 0) {			
-        if (cmd_app(cons, fat, cmdline) == 0) {		
+        if (cmd_app(cons, cmdline) == 0) {		
             if (cons->sht->task->langmode == 0) {
                 cons_putstr(cons, "Bad command.\n\n");
             } else {
@@ -396,7 +404,7 @@ void cmd_cls(struct CONSOLE *cons)
 void cmd_dir(struct CONSOLE *cons)
 {
     // dir/ls command
-    struct FILEINFO *finfo = (struct FILEINFO *) (ADR_DISKIMG + 0x002600);
+    FDINFO *finfo = (FDINFO *) (ADR_DISKIMG + 0x002600);
     int i, j;
     char s[30];
     for (i=0; i<224; i++) {
@@ -424,19 +432,16 @@ void cmd_dir(struct CONSOLE *cons)
  * @brief exit command (콘솔 종료 및 태스크 종료)
  * 
  * @param cons: 콘솔 구조체 포인터
- * @param fat: FAT 테이블 포인터
  * @return: void
  */
-void cmd_exit(struct CONSOLE *cons, int *fat)
+void cmd_exit(struct CONSOLE *cons)
 {
-    struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
     struct TASK *task = task_now();
     struct SHTCTL *shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
     struct FIFO32 *fifo = (struct FIFO32 *) *((int *) 0x0fec);
     if (cons->sht != 0) {
         timer_cancel(cons->timer);
     }
-    memman_free_4k(memman, (int) fat, 4 * 2880);
     io_cli(); // disable CPU interrupts
     if (cons->sht != 0) {
         fifo32_put(fifo, cons->sht - shtctl->sheets0 + 768);    // 768 - 1023
@@ -574,18 +579,18 @@ void cmd_touch(struct CONSOLE *cons, char *cmdline)
     filename[j] = 0; // null-terminate
 
     if (filename[0] == 0) {
-        cons_putstr(cons, "Usage: touch [filename]\n");
+        cons_putstr(cons, "사용법: touch [filename]\n");
         return;
     }
 
     if (fd_writeopen(&fh, filename) == 0) {
-        cons_putstr(cons, "File open error.\n");
+        cons_putstr(cons, "파일 열기 오류.\n");
         return;
     }
 
     fh.modified = 1;
     fd_close(&fh);
-    cons_putstr(cons, "File created successfully.\n");
+    cons_putstr(cons, "파일 생성됨.\n");
     return;
 }
 
@@ -606,11 +611,10 @@ typedef struct HrbHeader {
  * @brief 애플리케이션 실행 명령어 처리 함수
  *
  * @param cons: 콘솔 구조체 포인터
- * @param fat: FAT 테이블 포인터
  * @param cmdline: 명령어 문자열
  * @return: 성공 시 1, 실패 시 0
  */
-int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
+int cmd_app(struct CONSOLE *cons, char *cmdline)
 {
     char name[13];
     int i;
@@ -654,7 +658,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
     } else {
         // 압축된 앱 압축 해제 후 파일 처리
         if (file_size < 17) {
-            cons_putstr(cons, "Invalid .hrb file format.\n");
+            cons_putstr(cons, "맞지 않는 hrb 파일 형식.\n");
             memman_free_4k(memman, (int) file_buf, file_size);
             return 0;
         }
@@ -666,13 +670,13 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
             memman_free_4k(memman, (int) file_buf, file_size);
 
             if (strncmp(exec_buf + 4, "Hari", 4) != 0) {
-                cons_putstr(cons, "Invalid .hrb file format.\n");
+                cons_putstr(cons, "맞지 않는 hrb 파일 형식.\n");
                 memman_free_4k(memman, (int) exec_buf, decomp_size);
                 return 0;
             }
             exec_size = decomp_size;
         } else {
-            cons_putstr(cons, "File decompression error.\n");
+            cons_putstr(cons, "파일 압축 해제 오류.\n");
             memman_free_4k(memman, (int) file_buf, file_size);
             return 0;
         }
@@ -930,28 +934,6 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
         int size = ecx;
 
         reg[7] = fd_write(fh, buf, size);
-    } else if (edx == 29) { // api_fopen_rw(char *fname, int mode)
-        FDHANDLE *fh = (FDHANDLE *)memman_alloc_4k(memman, sizeof(FDHANDLE));
-
-        int mode = ecx;
-
-        cons_putstr(cons, "[KERNEL] fopen request: \n");
-        cons_putstr(cons, (char *)ebx + ds_base);
-        cons_newline(cons);
-
-        int result = 0;
-        if (mode == 0) {
-            result = fd_open(fh, (char *)ebx + ds_base);
-        } else {
-            result = fd_writeopen(fh, (char *)ebx + ds_base);
-        }
-
-        if (result == 0) {
-            memman_free_4k(memman, (int)fh, sizeof(FDHANDLE));
-            reg[7] = 0;
-        } else {
-            reg[7] = (int)fh;
-        }
     }
 
     return 0;

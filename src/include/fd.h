@@ -28,4 +28,8 @@ void inthandler26(int *esp);
 
 short get_next_cluster(short cluster);
 
+// tek.c
+int tek_getsize(unsigned char *p);
+int tek_decomp(unsigned char *p, char *q, int size);
+
 #endif // _FD_H_

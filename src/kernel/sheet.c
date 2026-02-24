@@ -1,4 +1,9 @@
-// process overlay sheets (windows)
+/**
+ * @file sheet.c
+ * 
+ * @brief 윈도우 겹치기 처리를 위한 시트 컨트롤러 및 시트 관련 함수 구현
+ * 
+ */
 
 #include "../include/bootpack.h"
 

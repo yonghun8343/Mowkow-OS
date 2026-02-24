@@ -1,4 +1,9 @@
-// management of multitasking
+/**
+ * @file mtask.c
+ * 
+ * @brief 태스크 관리 함수 구현
+ * 
+ */
 
 #include "../include/bootpack.h"
 
