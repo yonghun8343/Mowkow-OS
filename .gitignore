@@ -15,7 +15,6 @@ tolset/
 out/
 build/
 *.iso
-graphics/
 Makefile.orig
 .jpg
 .txt
